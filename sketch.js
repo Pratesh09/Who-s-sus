@@ -154,10 +154,6 @@ function draw() {
   } else if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
     drawEndScreen();
   }
-
-  if (modalActive) {
-    drawModal();
-  }
 }
 
 // ==================== CUSTOM VECTOR BADGES ====================
@@ -167,27 +163,23 @@ function drawBlackoutBadge(x, y, scaleFactor) {
   translate(x, y);
   scale(scaleFactor);
 
-  // 1. Outer Yellow Warning Triangle
   stroke(241, 196, 15);
   strokeWeight(8);
   strokeJoin(ROUND);
   fill(45, 52, 54);
   triangle(0, -90, -80, 50, 80, 50);
 
-  // 2. Lightbulb / Spark Icon (Center)
   stroke(241, 196, 15);
   strokeWeight(3);
   noFill();
   ellipse(0, -25, 34, 34); 
   rect(-8, -8, 16, 12);   
 
-  // Lightning slash through lightbulb
   stroke(231, 76, 60); 
   strokeWeight(3);
   line(-12, -35, 12, -15);
   line(-5, -15, 8, -5);
 
-  // 3. Blackout Text Banner
   noStroke();
   fill(241, 196, 15);
   rect(-65, 15, 130, 24, 4);
@@ -206,7 +198,6 @@ function drawEmpBadge(x, y, scaleFactor) {
   translate(x, y);
   scale(scaleFactor);
 
-  // 1. Outer Cyan Hexagon Frame
   stroke(0, 255, 255);
   strokeWeight(5);
   strokeJoin(ROUND);
@@ -221,12 +212,10 @@ function drawEmpBadge(x, y, scaleFactor) {
   }
   endShape(CLOSE);
 
-  // 2. Signal Disruption / EMP Lightning Bolt Icon
   stroke(241, 196, 15);
   strokeWeight(4);
   noFill();
 
-  // Electric Spark Shape
   beginShape();
   vertex(-8, -25);
   vertex(10, -8);
@@ -236,13 +225,11 @@ function drawEmpBadge(x, y, scaleFactor) {
   vertex(2, -2);
   endShape(CLOSE);
 
-  // Disruption Pulse Rings
   stroke(0, 255, 255, 180);
   strokeWeight(2);
   arc(0, -2, 75, 75, QUARTER_PI, HALF_PI + QUARTER_PI);
   arc(0, -2, 75, 75, PI + QUARTER_PI, PI + HALF_PI + QUARTER_PI);
 
-  // 3. EMP Active Text Banner
   noStroke();
   fill(0, 255, 255);
   rect(-50, 30, 100, 20, 4);
@@ -289,7 +276,6 @@ function drawMultiplayerLobbyScreen() {
   textStyle(NORMAL);
   text("Connected Players in Room (1/4 Max):", width / 2, height / 2 - 40);
 
-  // Cleaned up lobby list with open slots for real human players instead of AIs
   let playersList = [
     localUsername + " (You - Host)",
     "Waiting for player...",
@@ -510,63 +496,30 @@ function getRoleColor(r) {
   }
 }
 
-// ==================== IN-CANVAS MODAL INPUT ====================
-
-function drawModal() {
-  fill(0, 0, 0, 220);
-  rect(0, 0, width, height);
-
-  fill(35);
-  stroke(255);
-  strokeWeight(2);
-  rect(width / 2 - 280, height / 2 - 220, 560, 440, 12);
-  noStroke();
-
-  fill(255);
-  textSize(12);
-  textStyle(NORMAL);
-  textAlign(CENTER, TOP);
-  text(modalPromptText, width / 2, height / 2 - 210);
-  textAlign(CENTER, CENTER);
-
-  fill(20);
-  stroke(100);
-  rect(width / 2 - 150, height / 2 + 155, 300, 32, 5);
-  noStroke();
-
-  fill(255);
-  textSize(16);
-  text(modalInputValue + "|", width / 2, height / 2 + 171);
-
-  drawButton(width / 2 - 60, height / 2 + 195, 120, 30, "Submit", color(46, 204, 113));
-}
+// ==================== NATIVE MOBILE PROMPT / INPUT ====================
 
 function openModal(promptText, callback) {
-  modalPromptText = promptText;
-  modalInputValue = "";
-  modalCallback = callback;
-  modalActive = true;
+  // Uses native browser dialog so mobile touch keyboards pop up automatically
+  let result = prompt(promptText);
+  if (result !== null) {
+    callback(result);
+  }
 }
 
 function closeModal() {
   modalActive = false;
-  if (modalCallback) {
-    modalCallback(modalInputValue);
-  }
 }
 
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
   if (isBlackoutActive) {
-    // End Blackout Button
     if (mouseX >= width / 2 - 210 && mouseX <= width / 2 - 20 &&
         mouseY >= height - 100 && mouseY <= height - 60) {
       isBlackoutActive = false;
       setPersistentAnnouncement("Blackout Interrogation ended.");
       return;
     }
-    // Kick Target Button during Blackout
     if (mouseX >= width / 2 + 20 && mouseX <= width / 2 + 210 &&
         mouseY >= height - 100 && mouseY <= height - 60) {
       let targetName = (blackoutTargetPlayer === 0) ? localUsername : ("Player " + blackoutTargetPlayer);
@@ -574,14 +527,6 @@ function mousePressed() {
       isBlackoutActive = false;
       setPersistentAnnouncement("Blackout Action: " + targetName + " has been KICKED!");
       return;
-    }
-    return;
-  }
-
-  if (modalActive) {
-    if (mouseX >= width / 2 - 60 && mouseX <= width / 2 + 60 &&
-        mouseY >= height / 2 + 195 && mouseY <= height / 2 + 225) {
-      closeModal();
     }
     return;
   }
@@ -707,16 +652,10 @@ function mousePressed() {
   }
 }
 
-function keyPressed() {
-  if (modalActive) {
-    if (keyCode === ENTER || keyCode === RETURN) {
-      closeModal();
-    } else if (keyCode === BACKSPACE) {
-      modalInputValue = modalInputValue.substring(0, modalInputValue.length - 1);
-    } else if (key.length === 1) {
-      modalInputValue += key;
-    }
-  }
+// Touch support for mobile devices
+function touchStarted() {
+  mousePressed();
+  return false;
 }
 
 // ==================== MODE SELECTION & SETUP ====================
@@ -766,7 +705,6 @@ function startMultiplayerGame() {
 
   setTimeout(() => {
     currentScreen = "screen2";
-    // In multiplayer mode, no AI loop interval is executed
   }, 3000);
 }
 
