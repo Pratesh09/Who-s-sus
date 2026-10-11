@@ -491,7 +491,7 @@ function getRoleColor(r) {
   }
 }
 
-// ==================== NATIVE MOBILE PROMPT / INPUT ====================
+// ==================== NATIVE MOBILE PROMPT ====================
 
 function openModal(promptText, callback) {
   let result = prompt(promptText);
@@ -504,8 +504,6 @@ function openModal(promptText, callback) {
 
 function createMultiplayerRoom() {
   currentRoomCode = "ROOM-" + floor(random(1000, 9999));
-  
-  // Initialize PeerJS with custom room code
   peer = new Peer(currentRoomCode);
 
   peer.on('open', (id) => {
@@ -542,8 +540,6 @@ function joinMultiplayerRoom(code) {
       currentScreen = "multiplayer_lobby";
       statusMessage = "Connected to room: " + code;
       setupConnectionHandlers();
-      
-      // Tell host we joined
       conn.send({ type: "JOIN", name: localUsername });
     });
 
@@ -617,7 +613,15 @@ function mousePressed() {
           if (authorizedUsers[lowerUser] && enteredCode === "9315") {
             localUsername = enteredUser;
             userRank = authorizedUsers[lowerUser];
-            if (userRank === "Dev") isDevModeActive = true;
+            
+            if (userRank === "Dev") {
+              isDevModeActive = true;
+              handleDevMenu();
+            } else if (userRank === "Admin") {
+              handleAdminMenu();
+            } else if (userRank === "Moderator") {
+              handleModeratorMenu();
+            }
           }
         }
       });
@@ -667,6 +671,17 @@ function mousePressed() {
           mouseY >= card.y && mouseY <= card.y + card.h) {
         handleRoleAction(i + 1, i);
       }
+    }
+
+    if (isDevModeActive && userRank === "Dev" && mouseX >= width - 140 && mouseX <= width - 20 &&
+        mouseY >= 20 && mouseY <= 55) {
+      handleDevMenu();
+    }
+
+    if (!isPlayerAlive && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
+        mouseY >= height - 90 && mouseY <= height - 45) {
+      isSpectating = true;
+      setPersistentAnnouncement("SPECTATING MODE: Watching remaining players...");
     }
   } else if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
     if (mouseX >= width / 2 - 100 && mouseX <= width / 2 + 100 &&
@@ -754,7 +769,18 @@ function setupSingleplayerRoles() {
     }
   }
   
+  for (let k = remainingPool.length - 1; k > 0; k--) {
+    let j = floor(random(0, k + 1));
+    let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
+  }
+
   let deck = [primaryBadRole, 3, guaranteedTown, remainingPool[0]];
+
+  for (let d = deck.length - 1; d > 0; d--) {
+    let r = floor(random(0, d + 1));
+    let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
+  }
+
   role = deck[0];
   for (let t = 0; t < 3; t++) {
     targetRoles[t] = deck[t + 1];
@@ -765,17 +791,353 @@ function setupRoleUI() {
   for (let i = 0; i < 3; i++) {
     targetCards[i].borderColor = color(180);
   }
-  statusMessage = "Your Role is: " + getRoleName(role);
+
+  if (role === 1) statusMessage = "Killer: Who to eliminate?";
+  else if (role === 2) statusMessage = "Guardian Angel: Who to Protect?";
+  else if (role === 3) statusMessage = "Sheriff: Who to Take down?";
+  else if (role === 4) statusMessage = "Doctor: Who to Revive?";
+  else if (role === 5) statusMessage = "Detective: Who to Investigate?";
+  else if (role === 6) statusMessage = "Jester: Select Player 2, 3, or 4 to haunt!";
+  else if (role === 7) statusMessage = "Innocent: You have no abilities. Stay alive!";
+  else if (role === 8) statusMessage = "Hunter: If eliminated, you take someone down with you!";
+  else if (role === 9) statusMessage = vampireCharges > 0 ? "Vampire Stolen Ability (" + getRoleName(stolenRole) + ") ready!" : "Vampire: Who to eliminate?";
+  else if (role === 10) statusMessage = "Swapper: Who to swap roles with?";
+  else if (role === 11) statusMessage = "Hacker: Click any player to trigger EMP!";
+  else if (role === 12) statusMessage = "Altruist: Choose a player to mark for role announcement.";
+  else if (role === 13) statusMessage = "Witch: Click a player to guess their role!";
 }
+
+// ==================== HELPER & GAMEPLAY FUNCTIONS ====================
 
 function handleRoleAction(targetNum, cardIndex) {
   if (isSpectating || (!isPlayerAlive && !hunterRevengePending)) return;
+
+  if (isBlackoutActive) {
+    setPersistentAnnouncement("BLACKOUT IN EFFECT: Game actions frozen!");
+    return;
+  }
+
+  if (disabledRolePlayers.includes(0)) {
+    setPersistentAnnouncement("ROLE DISABLED: Ability stripped by Moderator!");
+    return;
+  }
+
+  if (hunterRevengePending) {
+    hunterRevengePending = false;
+    let tRole = targetRoles[targetNum - 1];
+    targetCards[cardIndex].borderColor = color(231, 76, 60);
+    isTargetAlive[targetNum - 1] = false;
+    notifyPlayerDeath(tRole, targetNum);
+
+    if (tRole === 1 || tRole === 9) {
+      winReason = "Town Wins: Hunter revenge-shot the " + getRoleName(tRole) + "!";
+      currentScreen = "screen5"; 
+      revealRoles();
+      return;
+    } else {
+      setPersistentAnnouncement("Hunter revenge-shot Player " + (targetNum + 1) + "!");
+      checkGameStatus();
+      if (currentScreen === "screen2") currentScreen = "screen3";
+    }
+    return;
+  }
+
+  if (empActive || manualEmpLock) {
+    setPersistentAnnouncement("EMP ACTIVE: All abilities jammed!");
+    return;
+  }
+
+  if (abilityCooldown || !isPlayerAlive) return;
+  if (role === 7) {
+    setPersistentAnnouncement("Innocents have no night abilities!");
+    return;
+  }
+
   let targetRole = targetRoles[targetNum - 1];
 
+  if (role === 1) { // KILLER
+    if (targetRole === 9) {
+      setPersistentAnnouncement("ATTACK FAILED! Killer cannot eliminate the Vampire!");
+      triggerAbilityCooldown();
+      return;
+    }
+    if (protectedPlayer === targetNum) {
+      revealedKillerID = 0;
+      setPersistentAnnouncement("ATTACK BLOCKED! Player was guarded! Killer REVEALED!");
+      protectedPlayer = null;
+    } else {
+      targetCards[cardIndex].borderColor = color(231, 76, 60);
+      isTargetAlive[targetNum - 1] = false;
+      notifyPlayerDeath(targetRole, targetNum);
+      if (targetRole === 8) triggerHunterRevenge(targetNum);
+      else checkGameStatus();
+    }
+    triggerAbilityCooldown();
+  } else if (role === 2) { // GA
+    protectedPlayer = targetNum;
+    targetCards[cardIndex].borderColor = color(46, 204, 113);
+    setPersistentAnnouncement("You are guarding Player " + (targetNum + 1) + ".");
+    triggerAbilityCooldown();
+  } else if (role === 3) { // SHERIFF
+    if (targetRole === 1 || targetRole === 9) { 
+      targetCards[cardIndex].borderColor = color(231, 76, 60);
+      winReason = "Town Wins: Sheriff shot the " + getRoleName(targetRole) + "!";
+      currentScreen = "screen5"; 
+      revealRoles();
+    } else if (targetRole === 6) {
+      targetCards[cardIndex].borderColor = color(230, 126, 34);
+      isTargetAlive[targetNum - 1] = false;
+      notifyPlayerDeath(6, targetNum);
+      winReason = "Jester Wins: The Jester was eliminated!";
+      currentScreen = "screen6"; 
+      revealRoles();
+    } else if ([10, 12, 13].includes(targetRole)) {
+      targetCards[cardIndex].borderColor = color(231, 76, 60);
+      isTargetAlive[targetNum - 1] = false;
+      notifyPlayerDeath(targetRole, targetNum);
+      checkGameStatus();
+      triggerAbilityCooldown();
+    } else { 
+      winReason = "Killer Wins: Sheriff executed a Town member!";
+      currentScreen = "screen4"; 
+      revealRoles();
+    }
+  } else if (role === 4) { // DOCTOR
+    targetCards[cardIndex].borderColor = color(255);
+    isTargetAlive[targetNum - 1] = true;
+    setPersistentAnnouncement("You revived Player " + (targetNum + 1) + "!");
+    checkGameStatus();
+    triggerAbilityCooldown();
+  } else if (role === 5) { // DETECTIVE
+    let res = (suspiciousTarget === targetNum || targetRole === 1 || targetRole === 9) ? "SUSPICIOUS!" : "INNOCENT.";
+    setPersistentAnnouncement("Result: Player " + (targetNum + 1) + " is " + res);
+    triggerAbilityCooldown();
+  } else if (role === 6) { // JESTER
+    executeSingleJesterHaunt(targetNum, cardIndex);
+    triggerAbilityCooldown();
+  } else if (role === 9) { // VAMPIRE
+    executeVampireAbility(targetNum, cardIndex);
+  } else if (role === 10) { // SWAPPER
+    performRoleSwap(targetNum);
+    triggerAbilityCooldown();
+  } else if (role === 11) { // HACKER
+    triggerHackerEmp();
+    triggerAbilityCooldown();
+  } else if (role === 12) { // ALTRUIST
+    altruistSelectedTarget = targetNum;
+    setPersistentAnnouncement("Altruist Marked: Player " + (targetNum + 1) + "!");
+    triggerAbilityCooldown();
+  } else if (role === 13) { // WITCH
+    executeWitchGuess(targetNum, cardIndex, 0);
+    triggerAbilityCooldown();
+  }
+}
+
+function executeSingleJesterHaunt(targetNum, cardIndex) {
+  if (!isTargetAlive[targetNum - 1]) return;
+  let targetRole = targetRoles[targetNum - 1];
+  isTargetAlive[targetNum - 1] = false;
+  targetCards[cardIndex].borderColor = color(155, 89, 182);
+  notifyPlayerDeath(targetRole, targetNum);
+  if (targetRole === 8) triggerHunterRevenge(targetNum);
+  else checkGameStatus();
+}
+
+function notifyPlayerDeath(eliminatedRole, eliminatedID) {
+  hasAnyPlayerDied = true;
+  lastEliminatedRole = eliminatedRole;
+
+  if (eliminatedRole && eliminatedRole !== 9) {
+    stolenRole = eliminatedRole;
+    vampireCharges = 1;
+    if (role === 9 && currentScreen === "screen2") {
+      setPersistentAnnouncement("ABSORBED! You stole the ability of: " + getRoleName(stolenRole) + "!");
+    }
+  }
+
+  if (eliminatedRole === 12 && altruistSelectedTarget !== null) {
+    let name = (altruistSelectedTarget === 0) ? localUsername : ("Player " + (altruistSelectedTarget + 1));
+    let r = (altruistSelectedTarget === 0) ? role : targetRoles[altruistSelectedTarget - 1];
+    setPersistentAnnouncement("ALTRUIST REVEAL: " + name + " is " + getRoleName(r) + "!");
+  }
+
+  if (eliminatedRole === 3) {
+    winReason = "Killer Wins: The Sheriff was eliminated!";
+    currentScreen = "screen4"; 
+    revealRoles();
+  }
+}
+
+function triggerAbilityCooldown() {
+  abilityCooldown = true;
+  cooldownTimer = 30;
+  let timerInterval = setInterval(() => {
+    cooldownTimer--;
+    if (announcementHoldTimer > 0) announcementHoldTimer--;
+
+    if (currentScreen === "screen2" && isPlayerAlive && !empActive && !manualEmpLock) {
+      statusMessage = "Cooldown: " + cooldownTimer + "s";
+    }
+    if (cooldownTimer <= 0) {
+      clearInterval(timerInterval);
+      abilityCooldown = false;
+      if (currentScreen === "screen2" && isPlayerAlive && !empActive && !manualEmpLock) {
+        setupRoleUI();
+      }
+    }
+  }, 1000);
+}
+
+function handlePlayerDeath() {
+  isPlayerAlive = false;
+  notifyPlayerDeath(role, 0);
+
+  if (role === 8 && !hunterRevengePending) {
+    triggerHunterRevenge(0);
+    return;
+  }
+  
+  checkGameStatus();
+  if (!isPlayerAlive && currentScreen === "screen2") currentScreen = "screen3";
+}
+
+function triggerHunterRevenge(victimID) {
+  if (victimID === 0) { 
+    setPersistentAnnouncement("YOU WERE ELIMINATED! Take someone down or click 'Show Mercy'.");
+    hunterRevengePending = true;
+  } else { 
+    let targets = [];
+    if (isPlayerAlive) targets.push(0);
+    for (let i = 0; i < 3; i++) {
+      if (i !== (victimID - 1) && isTargetAlive[i]) targets.push(i + 1);
+    }
+
+    if (targets.length > 0) {
+      let revengeTarget = targets[floor(random(0, targets.length))];
+      let revTargetRole = (revengeTarget === 0) ? role : targetRoles[revengeTarget - 1];
+
+      if (revengeTarget === 0) {
+        setPersistentAnnouncement("Hunter Player " + (victimID + 1) + " revenge-shot YOU!");
+        handlePlayerDeath();
+      } else {
+        isTargetAlive[revengeTarget - 1] = false;
+        targetCards[revengeTarget - 1].borderColor = color(231, 76, 60);
+        notifyPlayerDeath(revTargetRole, revengeTarget);
+        setPersistentAnnouncement("Hunter Player revenge-shot Player " + (revengeTarget + 1) + "!");
+      }
+
+      if (revTargetRole === 1 || revTargetRole === 9) {
+        winReason = "Town Wins: Hunter revenge-shot the " + getRoleName(revTargetRole) + "!";
+        currentScreen = "screen5"; 
+        revealRoles();
+      } else {
+        checkGameStatus();
+      }
+    }
+  }
+}
+
+function triggerHackerEmp() {
+  empActive = true;
+  setPersistentAnnouncement("EMP ACTIVATED! All abilities globally disabled for 15s!");
+  setTimeout(() => {
+    empActive = false;
+    if (currentScreen === "screen2" && isPlayerAlive && !manualEmpLock) {
+      setPersistentAnnouncement("EMP Expired! Abilities restored.");
+      setupRoleUI();
+    }
+  }, 15000);
+}
+
+function performRoleSwap(targetNum) {
+  let targetRole = targetRoles[targetNum - 1];
+  if (targetRole === 1 || targetRole === 9) {
+    setPersistentAnnouncement("SWAP FAILED! Attempted swap with Killer/Vampire!");
+    handlePlayerDeath();
+    return;
+  }
+  let oldPlayerRole = role;
+  role = targetRole;
+  targetRoles[targetNum - 1] = oldPlayerRole;
+  setPersistentAnnouncement("SWAP SUCCESS! You are now " + getRoleName(role) + "!");
+  setupRoleUI();
+}
+
+function executeWitchGuess(targetNum, cardIndex, witchActorID) {
+  let actualRole = (targetNum === 0) ? role : targetRoles[targetNum - 1];
+  openModal("WITCH GUESS: Enter Role ID (1-13):\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (val) => {
+    let guessedRole = parseInt(val);
+    if (isNaN(guessedRole) || guessedRole < 1 || guessedRole > 13) return;
+
+    if (guessedRole === actualRole) {
+      setPersistentAnnouncement("WITCH SPELL SUCCESS!");
+      if ([1, 9, 3, 6].includes(actualRole)) {
+        winReason = "Witch Wins: Correctly guessed a Key Role!";
+        currentScreen = "screen8"; 
+        revealRoles();
+        return;
+      }
+      if (targetNum === 0) handlePlayerDeath();
+      else {
+        isTargetAlive[targetNum - 1] = false;
+        targetCards[cardIndex].borderColor = color(155, 89, 182);
+        notifyPlayerDeath(actualRole, targetNum);
+        if (actualRole === 8) triggerHunterRevenge(targetNum);
+        else checkGameStatus();
+      }
+    } else {
+      setPersistentAnnouncement("WITCH SPELL FAILED! Wrong guess!");
+      if (witchActorID === 0) handlePlayerDeath();
+    }
+  });
+}
+
+function executeVampireAbility(targetNum, cardIndex) {
+  let targetRole = targetRoles[targetNum - 1];
+  if (vampireCharges > 0 && stolenRole !== null) {
+    vampireCharges = 0; 
+    stolenRole = null;
+    setPersistentAnnouncement("Vampire used stolen ability!");
+    triggerAbilityCooldown();
+    return;
+  }
+  if (targetRole === 1) {
+    setPersistentAnnouncement("ATTACK FAILED! Vampire cannot eliminate Killer!");
+    triggerAbilityCooldown();
+    return;
+  }
   targetCards[cardIndex].borderColor = color(231, 76, 60);
   isTargetAlive[targetNum - 1] = false;
-  setPersistentAnnouncement("Action performed on Player " + (targetNum + 1));
-  checkGameStatus();
+  notifyPlayerDeath(targetRole, targetNum);
+  triggerAbilityCooldown();
+}
+
+// ==================== SINGLEPLAYER AI LOOP ====================
+
+function executeAiRole(actorID, actorRole, allowsSheriffToFireThisTurn) {
+  if (isMultiplayer || empActive || manualEmpLock || disabledRolePlayers.includes(actorID) || isBlackoutActive) return;
+
+  let aliveAiTargets = [];
+  for (let i = 0; i < totalPlayersCount - 1; i++) {
+    if (actorID !== (i + 1) && isTargetAlive[i]) aliveAiTargets.push(i + 1);
+  }
+
+  if (actorRole === 1 || actorRole === 9) {
+    let possibleTargets = [];
+    if (isPlayerAlive) possibleTargets.push(0);
+    for (let m = 0; m < aliveAiTargets.length; m++) possibleTargets.push(aliveAiTargets[m]);
+
+    if (possibleTargets.length > 0) {
+      let chosenTarget = possibleTargets[floor(random(0, possibleTargets.length))];
+      if (chosenTarget === 0) handlePlayerDeath();
+      else {
+        isTargetAlive[chosenTarget - 1] = false;
+        targetCards[chosenTarget - 1].borderColor = color(231, 76, 60);
+        notifyPlayerDeath(targetRoles[chosenTarget - 1], chosenTarget);
+        checkGameStatus();
+      }
+    }
+  }
 }
 
 function startRoleGameLoop() {
@@ -784,9 +1146,10 @@ function startRoleGameLoop() {
 
   gameLoopInterval = setInterval(() => {
     if (currentScreen === "screen2" && !hunterRevengePending && !isBlackoutActive) {
+      let allowsSheriffThisTurn = hasAnyPlayerDied;
       for (let i = 0; i < totalPlayersCount - 1; i++) {
         if (isTargetAlive[i] && targetRoles[i] !== role) {
-          // AI simulation tick
+          executeAiRole(i + 1, targetRoles[i], allowsSheriffThisTurn);
         }
       }
     }
@@ -799,9 +1162,19 @@ function checkGameStatus() {
     if ((targetRoles[k] === 1 || targetRoles[k] === 9) && isTargetAlive[k]) isKillerAlive = true;
   }
 
+  let nonKillerAliveCount = 0;
+  if (role !== 1 && role !== 9 && isPlayerAlive) nonKillerAliveCount++;
+  for (let t = 0; t < totalPlayersCount - 1; t++) {
+    if (targetRoles[t] !== 1 && targetRoles[t] !== 9 && isTargetAlive[t]) nonKillerAliveCount++;
+  }
+
   if (!isKillerAlive) {
-    winReason = "Town Wins: The Killer/Vampire has been eliminated!";
+    winReason = "Town Wins: Killer/Vampire eliminated!";
     currentScreen = "screen5"; 
+    revealRoles();
+  } else if (nonKillerAliveCount <= 0) {
+    winReason = "Killer Wins: All Town members eliminated!";
+    currentScreen = "screen4"; 
     revealRoles();
   }
 }
@@ -813,10 +1186,21 @@ function revealRoles() {
   }
 }
 
+// ==================== STAFF & DEV MENUS ====================
+
 function handleDevMenu() {
-  openModal("DEV OPTIONS:\n1. Toggle Shield\n2. Kill Self", (val) => {
-    if (val === "1") showShieldIcon = !showShieldIcon;
-    if (val === "2") isPlayerAlive = false;
+  let devMenuText = "DEV SANDBOX TOOLS:\n1. Choose Role\n2. Kill Self\n3. Toggle Shield\nEnter option:";
+  openModal(devMenuText, (val) => {
+    if (val === "1") {
+      openModal("Enter Role ID (1-13):", (rVal) => {
+        let chosen = parseInt(rVal);
+        if (!isNaN(chosen) && chosen >= 1 && chosen <= 13) {
+          role = chosen;
+          setupRoleUI();
+        }
+      });
+    } else if (val === "2") handlePlayerDeath();
+    else if (val === "3") showShieldIcon = !showShieldIcon;
   });
 }
 
@@ -827,5 +1211,7 @@ function handleAdminMenu() {
 }
 
 function handleModeratorMenu() {
-  openModal("MODERATOR PANEL:\n1. Mute Player", () => {});
+  openModal("MODERATOR PANEL:\n1. Trigger Blackout", () => {
+    isBlackoutActive = true;
+  });
 }
