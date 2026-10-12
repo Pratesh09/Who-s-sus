@@ -249,18 +249,21 @@ function drawStartScreen() {
   fill(255);
   textSize(38);
   textStyle(BOLD);
-  text("13-Role Social Deduction", width / 2, height / 2 - 160);
+  text("13-Role Social Deduction", width / 2, height / 2 - 170);
 
   textSize(18);
   textStyle(NORMAL);
-  text("Choose your game mode below", width / 2, height / 2 - 110);
+  text("Current Player: " + localUsername + (userRank ? " (" + userRank + ")" : ""), width / 2, height / 2 - 120);
 
-  drawButton(width / 2 - 130, height / 2 - 60, 260, 45, "Start Singleplayer", color(46, 204, 113));
-  drawButton(width / 2 - 130, height / 2, 260, 45, "Create Multiplayer Room", color(52, 152, 219));
-  drawButton(width / 2 - 130, height / 2 + 60, 260, 45, "Join Multiplayer Room", color(155, 89, 182));
-  drawButton(width / 2 - 80, height / 2 + 135, 160, 38, "Staff Assist", color(52, 73, 94));
+  drawButton(width / 2 - 130, height / 2 - 70, 260, 42, "Start Singleplayer", color(46, 204, 113));
+  drawButton(width / 2 - 130, height / 2 - 20, 260, 42, "Create Multiplayer Room", color(52, 152, 219));
+  drawButton(width / 2 - 130, height / 2 + 30, 260, 42, "Join Multiplayer Room", color(155, 89, 182));
+  
+  // New Account Settings Button
+  drawButton(width / 2 - 130, height / 2 + 85, 260, 38, "Account Settings", color(52, 73, 94));
+  
+  drawButton(width / 2 - 80, height / 2 + 135, 160, 35, "Staff Assist", color(108, 122, 137));
 }
-
 function drawMultiplayerLobbyScreen() {
   fill(255);
   textSize(34);
