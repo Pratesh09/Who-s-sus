@@ -263,6 +263,18 @@ function drawStartScreen() {
   drawButton(width / 2 - 130, height / 2 + 85, 260, 38, "Account Settings", color(52, 73, 94));
   
   drawButton(width / 2 - 80, height / 2 + 135, 160, 35, "Staff Assist", color(108, 122, 137));
+  // Inside `if (currentScreen === "screen0")`
+    else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
+             mouseY >= height / 2 + 85 && mouseY <= height / 2 + 123) {
+      openModal("Enter your desired username:", (val) => {
+        let newName = val.trim();
+        if (newName !== "") {
+          localUsername = newName;
+          updateLocalUserRank();
+          setPersistentAnnouncement("Username updated to: " + localUsername);
+        }
+      });
+    }
 }
 function drawMultiplayerLobbyScreen() {
   fill(255);
