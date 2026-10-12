@@ -13,7 +13,7 @@ let connectedPeersList = [];
 
 let isDevModeActive = false;
 let userRank = ""; // "Dev", "Admin", or "Moderator"
-let showShieldIcon = false; // Hidden by default when joining/playing
+let showShieldIcon = false; 
 
 // Coordinates and radius for interactive shield clicking
 let shieldClickX = 0;
@@ -29,21 +29,17 @@ const authorizedUsers = {
   "tankamdemkin": "Admin"
 };
 
-// Lists for multiplayer server moderation tracking
 let serverBannedUsers = [];
 let serverKickedUsers = [];
 let serverMutedUsers = [];
-let disabledRolePlayers = []; // Track players whose role mechanics are shut down
+let disabledRolePlayers = []; 
 
-// Blackout State
 let isBlackoutActive = false;
 let blackoutTargetPlayer = null;
 
-// Announcement Hold State
 let announcementText = "";
 let announcementHoldTimer = 0;
 
-// Roles (1-13)
 const roleNames = [
   "Killer", "Guardian Angel", "Sheriff", "Doctor", 
   "Detective", "Jester", "Innocent", "Hunter", 
@@ -51,7 +47,7 @@ const roleNames = [
 ];
 
 let role = 0;         
-let targetRoles = [0, 0, 0]; // For Dummies/Players 1 through 3
+let targetRoles = [0, 0, 0]; 
 
 let isTargetAlive = [true, true, true]; 
 let isPlayerAlive = true;   
@@ -63,7 +59,7 @@ let winReason = "";
 let abilityCooldown = false; 
 let cooldownTimer = 0;
 let empActive = false; 
-let manualEmpLock = false; // Staff/Admin/Dev manual toggle
+let manualEmpLock = false; 
 
 let vampireCharges = 0; 
 let stolenRole = null; 
@@ -80,7 +76,6 @@ let isSpectating = false;
 let statusMessage = "Welcome to Social Deduction!";
 let endSummaryText = "";
 
-// Bounding Boxes & Modal State
 let targetCards = [];
 let modalActive = false;
 let gameLoopInterval = null;
@@ -121,23 +116,18 @@ function windowResized() {
 function draw() {
   background(25);
 
-  // Blackout Overlay Effect (Game Frozen)
   if (isBlackoutActive) {
     background(15);
-
     drawBlackoutBadge(width / 2, height / 2 - 50, 1.6);
-
     fill(231, 76, 60);
     textSize(22);
     textStyle(BOLD);
     text("BLACKOUT IN EFFECT: GAME FROZEN FOR INTERROGATION", width / 2, 60);
-
     fill(255);
     textSize(18);
     textStyle(NORMAL);
     let targetName = (blackoutTargetPlayer === 0) ? localUsername : ("Player " + blackoutTargetPlayer);
     text("Private Channel Connected With: " + targetName, width / 2, height / 2 + 70);
-    
     drawButton(width / 2 - 210, height - 100, 190, 40, "End Blackout", color(192, 57, 43));
     drawButton(width / 2 + 20, height - 100, 190, 40, "Kick Target", color(211, 84, 0));
     return;
@@ -162,34 +152,28 @@ function drawBlackoutBadge(x, y, scaleFactor) {
   push();
   translate(x, y);
   scale(scaleFactor);
-
   stroke(241, 196, 15);
   strokeWeight(8);
   strokeJoin(ROUND);
   fill(45, 52, 54);
   triangle(0, -90, -80, 50, 80, 50);
-
   stroke(241, 196, 15);
   strokeWeight(3);
   noFill();
   ellipse(0, -25, 34, 34); 
   rect(-8, -8, 16, 12);   
-
   stroke(231, 76, 60); 
   strokeWeight(3);
   line(-12, -35, 12, -15);
   line(-5, -15, 8, -5);
-
   noStroke();
   fill(241, 196, 15);
   rect(-65, 15, 130, 24, 4);
-
   fill(25);
   textSize(13);
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
   text("BLACKOUT", 0, 27);
-
   pop();
 }
 
@@ -197,12 +181,10 @@ function drawEmpBadge(x, y, scaleFactor) {
   push();
   translate(x, y);
   scale(scaleFactor);
-
   stroke(0, 255, 255);
   strokeWeight(5);
   strokeJoin(ROUND);
   fill(20, 30, 45);
-
   beginShape();
   for (let i = 0; i < 6; i++) {
     let angle = TWO_PI / 6 * i - HALF_PI;
@@ -211,11 +193,9 @@ function drawEmpBadge(x, y, scaleFactor) {
     vertex(hx, hy);
   }
   endShape(CLOSE);
-
   stroke(241, 196, 15);
   strokeWeight(4);
   noFill();
-
   beginShape();
   vertex(-8, -25);
   vertex(10, -8);
@@ -224,22 +204,18 @@ function drawEmpBadge(x, y, scaleFactor) {
   vertex(-10, 5);
   vertex(2, -2);
   endShape(CLOSE);
-
   stroke(0, 255, 255, 180);
   strokeWeight(2);
   arc(0, -2, 75, 75, QUARTER_PI, HALF_PI + QUARTER_PI);
   arc(0, -2, 75, 75, PI + QUARTER_PI, PI + HALF_PI + QUARTER_PI);
-
   noStroke();
   fill(0, 255, 255);
   rect(-50, 30, 100, 20, 4);
-
   fill(15);
   textSize(11);
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
   text("STAFF EMP", 0, 40);
-
   pop();
 }
 
@@ -247,35 +223,26 @@ function drawEmpBadge(x, y, scaleFactor) {
 
 function drawStartScreen() {
   fill(255);
-  textSize(38);
+  textSize(36);
   textStyle(BOLD);
-  text("13-Role Social Deduction", width / 2, height / 2 - 170);
+  text("13-Role Social Deduction", width / 2, height / 2 - 180);
 
-  textSize(18);
+  textSize(16);
   textStyle(NORMAL);
-  text("Current Player: " + localUsername + (userRank ? " (" + userRank + ")" : ""), width / 2, height / 2 - 120);
+  fill(200);
+  text("Player: " + localUsername + (userRank ? " (" + userRank + ")" : ""), width / 2, height / 2 - 135);
 
-  drawButton(width / 2 - 130, height / 2 - 70, 260, 42, "Start Singleplayer", color(46, 204, 113));
-  drawButton(width / 2 - 130, height / 2 - 20, 260, 42, "Create Multiplayer Room", color(52, 152, 219));
-  drawButton(width / 2 - 130, height / 2 + 30, 260, 42, "Join Multiplayer Room", color(155, 89, 182));
+  drawButton(width / 2 - 130, height / 2 - 100, 260, 40, "Start Singleplayer", color(46, 204, 113));
+  drawButton(width / 2 - 130, height / 2 - 50, 260, 40, "Create Multiplayer Room", color(52, 152, 219));
+  drawButton(width / 2 - 130, height / 2, 260, 40, "Join Multiplayer Room", color(155, 89, 182));
   
   // New Account Settings Button
-  drawButton(width / 2 - 130, height / 2 + 85, 260, 38, "Account Settings", color(52, 73, 94));
+  drawButton(width / 2 - 130, height / 2 + 50, 260, 38, "Account Settings", color(52, 73, 94));
   
-  drawButton(width / 2 - 80, height / 2 + 135, 160, 35, "Staff Assist", color(108, 122, 137));
-  // Inside `if (currentScreen === "screen0")`
-    else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 + 85 && mouseY <= height / 2 + 123) {
-      openModal("Enter your desired username:", (val) => {
-        let newName = val.trim();
-        if (newName !== "") {
-          localUsername = newName;
-          updateLocalUserRank();
-          setPersistentAnnouncement("Username updated to: " + localUsername);
-        }
-      });
-    }
+  // Staff Assist Button
+  drawButton(width / 2 - 80, height / 2 + 110, 160, 35, "Staff Assist", color(108, 122, 137));
 }
+
 function drawMultiplayerLobbyScreen() {
   fill(255);
   textSize(34);
@@ -599,16 +566,19 @@ function mousePressed() {
   }
 
   if (currentScreen === "screen0") {
+    // Start Singleplayer
     if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-        mouseY >= height / 2 - 60 && mouseY <= height / 2 - 15) {
+        mouseY >= height / 2 - 100 && mouseY <= height / 2 - 60) {
       startSingleplayer();
     }
+    // Create Multiplayer Room
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 && mouseY <= height / 2 + 45) {
+             mouseY >= height / 2 - 50 && mouseY <= height / 2 - 10) {
       createMultiplayerRoom();
     }
+    // Join Multiplayer Room
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 + 60 && mouseY <= height / 2 + 105) {
+             mouseY >= height / 2 && mouseY <= height / 2 + 40) {
       openModal("Enter Room Code to Join (e.g., ROOM-8315):", (val) => {
         let code = val.trim().toUpperCase();
         if (code !== "") {
@@ -616,8 +586,21 @@ function mousePressed() {
         }
       });
     }
+    // Account Settings Button
+    else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
+             mouseY >= height / 2 + 50 && mouseY <= height / 2 + 88) {
+      openModal("Enter your desired username:", (val) => {
+        let newName = val.trim();
+        if (newName !== "") {
+          localUsername = newName;
+          updateLocalUserRank();
+          setPersistentAnnouncement("Username updated to: " + localUsername);
+        }
+      });
+    }
+    // Staff Assist Button
     else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
-             mouseY >= height / 2 + 135 && mouseY <= height / 2 + 173) {
+             mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
       openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
         let parts = val.trim().split(":");
         if (parts.length === 2) {
@@ -696,7 +679,7 @@ function mousePressed() {
     if (!isPlayerAlive && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
         mouseY >= height - 90 && mouseY <= height - 45) {
       isSpectating = true;
-      setPersistentAnnouncement("SPECTATING MODE: Watching remaining players...");
+      setPersistentAnnouncement("SPECTATING MODE: Watching the remaining players...");
     }
   } else if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
     if (mouseX >= width / 2 - 100 && mouseX <= width / 2 + 100 &&
@@ -828,12 +811,12 @@ function handleRoleAction(targetNum, cardIndex) {
   if (isSpectating || (!isPlayerAlive && !hunterRevengePending)) return;
 
   if (isBlackoutActive) {
-    setPersistentAnnouncement("BLACKOUT IN EFFECT: Game actions frozen!");
+    setPersistentAnnouncement("BLACKOUT IN EFFECT: Game actions frozen during interrogation!");
     return;
   }
 
   if (disabledRolePlayers.includes(0)) {
-    setPersistentAnnouncement("ROLE DISABLED: Ability stripped by Moderator!");
+    setPersistentAnnouncement("ROLE DISABLED: A Moderator has stripped your role ability!");
     return;
   }
 
@@ -850,15 +833,18 @@ function handleRoleAction(targetNum, cardIndex) {
       revealRoles();
       return;
     } else {
-      setPersistentAnnouncement("Hunter revenge-shot Player " + (targetNum + 1) + "!");
+      setPersistentAnnouncement("Hunter revenge-shot Player " + (targetNum + 1) + " (" + getRoleName(tRole) + ")!");
       checkGameStatus();
-      if (currentScreen === "screen2") currentScreen = "screen3";
+
+      if (currentScreen === "screen2") {
+        currentScreen = "screen3";
+      }
     }
     return;
   }
 
   if (empActive || manualEmpLock) {
-    setPersistentAnnouncement("EMP ACTIVE: All abilities jammed!");
+    setPersistentAnnouncement("EMP ACTIVE: All abilities are jammed!");
     return;
   }
 
@@ -878,12 +864,13 @@ function handleRoleAction(targetNum, cardIndex) {
     }
     if (protectedPlayer === targetNum) {
       revealedKillerID = 0;
-      setPersistentAnnouncement("ATTACK BLOCKED! Player was guarded! Killer REVEALED!");
+      setPersistentAnnouncement("ATTACK BLOCKED! Player " + (targetNum + 1) + " was guarded! Killer REVEALED!");
       protectedPlayer = null;
     } else {
       targetCards[cardIndex].borderColor = color(231, 76, 60);
       isTargetAlive[targetNum - 1] = false;
       notifyPlayerDeath(targetRole, targetNum);
+
       if (targetRole === 8) triggerHunterRevenge(targetNum);
       else checkGameStatus();
     }
@@ -903,7 +890,7 @@ function handleRoleAction(targetNum, cardIndex) {
       targetCards[cardIndex].borderColor = color(230, 126, 34);
       isTargetAlive[targetNum - 1] = false;
       notifyPlayerDeath(6, targetNum);
-      winReason = "Jester Wins: The Jester was eliminated!";
+      winReason = "Jester Wins: The Jester was eliminated by the Sheriff!";
       currentScreen = "screen6"; 
       revealRoles();
     } else if ([10, 12, 13].includes(targetRole)) {
@@ -913,7 +900,7 @@ function handleRoleAction(targetNum, cardIndex) {
       checkGameStatus();
       triggerAbilityCooldown();
     } else { 
-      winReason = "Killer Wins: Sheriff executed a Town member!";
+      winReason = "Killer Wins: Sheriff executed a Town member (" + getRoleName(targetRole) + ")!";
       currentScreen = "screen4"; 
       revealRoles();
     }
@@ -940,7 +927,7 @@ function handleRoleAction(targetNum, cardIndex) {
     triggerAbilityCooldown();
   } else if (role === 12) { // ALTRUIST
     altruistSelectedTarget = targetNum;
-    setPersistentAnnouncement("Altruist Marked: Player " + (targetNum + 1) + "!");
+    setPersistentAnnouncement("Altruist Marked: Player " + (targetNum + 1) + "! Role revealed on death.");
     triggerAbilityCooldown();
   } else if (role === 13) { // WITCH
     executeWitchGuess(targetNum, cardIndex, 0);
@@ -954,6 +941,7 @@ function executeSingleJesterHaunt(targetNum, cardIndex) {
   isTargetAlive[targetNum - 1] = false;
   targetCards[cardIndex].borderColor = color(155, 89, 182);
   notifyPlayerDeath(targetRole, targetNum);
+
   if (targetRole === 8) triggerHunterRevenge(targetNum);
   else checkGameStatus();
 }
@@ -970,14 +958,16 @@ function notifyPlayerDeath(eliminatedRole, eliminatedID) {
     }
   }
 
-  if (eliminatedRole === 12 && altruistSelectedTarget !== null) {
-    let name = (altruistSelectedTarget === 0) ? localUsername : ("Player " + (altruistSelectedTarget + 1));
-    let r = (altruistSelectedTarget === 0) ? role : targetRoles[altruistSelectedTarget - 1];
-    setPersistentAnnouncement("ALTRUIST REVEAL: " + name + " is " + getRoleName(r) + "!");
+  if (eliminatedRole === 12) {
+    if (altruistSelectedTarget !== null) {
+      let name = (altruistSelectedTarget === 0) ? localUsername : ("Player " + (altruistSelectedTarget + 1));
+      let r = (altruistSelectedTarget === 0) ? role : targetRoles[altruistSelectedTarget - 1];
+      setPersistentAnnouncement("ALTRUIST REVEAL: " + name + " is " + getRoleName(r) + "!");
+    }
   }
 
   if (eliminatedRole === 3) {
-    winReason = "Killer Wins: The Sheriff was eliminated!";
+    winReason = "Killer Wins: The Sheriff was eliminated! Game lost for Citizens!";
     currentScreen = "screen4"; 
     revealRoles();
   }
@@ -988,7 +978,10 @@ function triggerAbilityCooldown() {
   cooldownTimer = 30;
   let timerInterval = setInterval(() => {
     cooldownTimer--;
-    if (announcementHoldTimer > 0) announcementHoldTimer--;
+
+    if (announcementHoldTimer > 0) {
+      announcementHoldTimer--;
+    }
 
     if (currentScreen === "screen2" && isPlayerAlive && !empActive && !manualEmpLock) {
       statusMessage = "Cooldown: " + cooldownTimer + "s";
@@ -1013,7 +1006,10 @@ function handlePlayerDeath() {
   }
   
   checkGameStatus();
-  if (!isPlayerAlive && currentScreen === "screen2") currentScreen = "screen3";
+
+  if (!isPlayerAlive && currentScreen === "screen2") {
+    currentScreen = "screen3";
+  }
 }
 
 function triggerHunterRevenge(victimID) {
@@ -1038,7 +1034,7 @@ function triggerHunterRevenge(victimID) {
         isTargetAlive[revengeTarget - 1] = false;
         targetCards[revengeTarget - 1].borderColor = color(231, 76, 60);
         notifyPlayerDeath(revTargetRole, revengeTarget);
-        setPersistentAnnouncement("Hunter Player revenge-shot Player " + (revengeTarget + 1) + "!");
+        setPersistentAnnouncement("Hunter Player " + (victimID + 1) + " revenge-shot Player " + (revengeTarget + 1) + "!");
       }
 
       if (revTargetRole === 1 || revTargetRole === 9) {
@@ -1055,6 +1051,7 @@ function triggerHunterRevenge(victimID) {
 function triggerHackerEmp() {
   empActive = true;
   setPersistentAnnouncement("EMP ACTIVATED! All abilities globally disabled for 15s!");
+  
   setTimeout(() => {
     empActive = false;
     if (currentScreen === "screen2" && isPlayerAlive && !manualEmpLock) {
@@ -1066,49 +1063,64 @@ function triggerHackerEmp() {
 
 function performRoleSwap(targetNum) {
   let targetRole = targetRoles[targetNum - 1];
+
   if (targetRole === 1 || targetRole === 9) {
-    setPersistentAnnouncement("SWAP FAILED! Attempted swap with Killer/Vampire!");
+    setPersistentAnnouncement("SWAP FAILED! Attempted swap with Killer/Vampire and eliminated!");
     handlePlayerDeath();
     return;
   }
+
   let oldPlayerRole = role;
   role = targetRole;
   targetRoles[targetNum - 1] = oldPlayerRole;
+
   setPersistentAnnouncement("SWAP SUCCESS! You are now " + getRoleName(role) + "!");
   setupRoleUI();
 }
 
 function executeWitchGuess(targetNum, cardIndex, witchActorID) {
   let actualRole = (targetNum === 0) ? role : targetRoles[targetNum - 1];
-  openModal("WITCH GUESS: Enter Role ID (1-13):\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (val) => {
+  
+  openModal("WITCH GUESS: Enter Role ID (1-13) for Player:\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (val) => {
     let guessedRole = parseInt(val);
     if (isNaN(guessedRole) || guessedRole < 1 || guessedRole > 13) return;
 
     if (guessedRole === actualRole) {
       setPersistentAnnouncement("WITCH SPELL SUCCESS!");
       if ([1, 9, 3, 6].includes(actualRole)) {
-        winReason = "Witch Wins: Correctly guessed a Key Role!";
+        winReason = "Witch Wins: Correctly guessed and eliminated a Key Role!";
         currentScreen = "screen8"; 
         revealRoles();
         return;
       }
-      if (targetNum === 0) handlePlayerDeath();
-      else {
+
+      if (targetNum === 0) {
+        handlePlayerDeath();
+      } else {
         isTargetAlive[targetNum - 1] = false;
         targetCards[cardIndex].borderColor = color(155, 89, 182);
         notifyPlayerDeath(actualRole, targetNum);
+
         if (actualRole === 8) triggerHunterRevenge(targetNum);
         else checkGameStatus();
       }
     } else {
-      setPersistentAnnouncement("WITCH SPELL FAILED! Wrong guess!");
-      if (witchActorID === 0) handlePlayerDeath();
+      setPersistentAnnouncement("WITCH SPELL FAILED! Your guess was wrong!");
+      if (witchActorID === 0) {
+        handlePlayerDeath();
+      } else {
+        isTargetAlive[witchActorID - 1] = false;
+        targetCards[witchActorID - 1].borderColor = color(231, 76, 60);
+        notifyPlayerDeath(13, witchActorID);
+        checkGameStatus();
+      }
     }
   });
 }
 
 function executeVampireAbility(targetNum, cardIndex) {
   let targetRole = targetRoles[targetNum - 1];
+
   if (vampireCharges > 0 && stolenRole !== null) {
     vampireCharges = 0; 
     stolenRole = null;
@@ -1116,14 +1128,25 @@ function executeVampireAbility(targetNum, cardIndex) {
     triggerAbilityCooldown();
     return;
   }
+
   if (targetRole === 1) {
-    setPersistentAnnouncement("ATTACK FAILED! Vampire cannot eliminate Killer!");
+    setPersistentAnnouncement("ATTACK FAILED! Vampire cannot eliminate the Killer!");
     triggerAbilityCooldown();
     return;
   }
-  targetCards[cardIndex].borderColor = color(231, 76, 60);
-  isTargetAlive[targetNum - 1] = false;
-  notifyPlayerDeath(targetRole, targetNum);
+
+  if (protectedPlayer === targetNum) {
+    setPersistentAnnouncement("ATTACK BLOCKED! Player was guarded!");
+    protectedPlayer = null;
+  } else {
+    targetCards[cardIndex].borderColor = color(231, 76, 60);
+    isTargetAlive[targetNum - 1] = false;
+    notifyPlayerDeath(targetRole, targetNum);
+
+    if (targetRole === 8) triggerHunterRevenge(targetNum);
+    else checkGameStatus();
+  }
+
   triggerAbilityCooldown();
 }
 
@@ -1134,7 +1157,9 @@ function executeAiRole(actorID, actorRole, allowsSheriffToFireThisTurn) {
 
   let aliveAiTargets = [];
   for (let i = 0; i < totalPlayersCount - 1; i++) {
-    if (actorID !== (i + 1) && isTargetAlive[i]) aliveAiTargets.push(i + 1);
+    if (actorID !== (i + 1) && isTargetAlive[i]) {
+      aliveAiTargets.push(i + 1);
+    }
   }
 
   if (actorRole === 1 || actorRole === 9) {
@@ -1144,8 +1169,9 @@ function executeAiRole(actorID, actorRole, allowsSheriffToFireThisTurn) {
 
     if (possibleTargets.length > 0) {
       let chosenTarget = possibleTargets[floor(random(0, possibleTargets.length))];
-      if (chosenTarget === 0) handlePlayerDeath();
-      else {
+      if (chosenTarget === 0) {
+        handlePlayerDeath();
+      } else {
         isTargetAlive[chosenTarget - 1] = false;
         targetCards[chosenTarget - 1].borderColor = color(231, 76, 60);
         notifyPlayerDeath(targetRoles[chosenTarget - 1], chosenTarget);
@@ -1204,29 +1230,76 @@ function revealRoles() {
 // ==================== STAFF & DEV MENUS ====================
 
 function handleDevMenu() {
-  let devMenuText = "DEV SANDBOX TOOLS:\n1. Choose Role\n2. Kill Self\n3. Toggle Shield\nEnter option:";
+  let devMenuText = "DEV CONTROL PANEL:\n" +
+                    "1. Choose Role (1-13)\n" +
+                    "2. Kill Self\n" +
+                    "3. Revive/Guard Target\n" +
+                    "4. Toggle Shield Icon\n" +
+                    "Enter option:";
   openModal(devMenuText, (val) => {
-    if (val === "1") {
-      openModal("Enter Role ID (1-13):", (rVal) => {
+    let option = val.trim();
+    if (option === "1") {
+      openModal("Enter Role ID (1-13):\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (rVal) => {
         let chosen = parseInt(rVal);
         if (!isNaN(chosen) && chosen >= 1 && chosen <= 13) {
           role = chosen;
           setupRoleUI();
         }
       });
-    } else if (val === "2") handlePlayerDeath();
-    else if (val === "3") showShieldIcon = !showShieldIcon;
+    } else if (option === "2") {
+      handlePlayerDeath();
+    } else if (option === "3") {
+      isTargetAlive = [true, true, true];
+      isPlayerAlive = true;
+      setupRoleUI();
+      setPersistentAnnouncement("Dev Action: All players revived!");
+    } else if (option === "4") {
+      showShieldIcon = !showShieldIcon;
+      setPersistentAnnouncement("Shield toggled: " + (showShieldIcon ? "ON" : "OFF"));
+    }
   });
 }
 
 function handleAdminMenu() {
-  openModal("ADMIN PANEL:\n1. Close Room", () => {
-    currentScreen = "screen0";
+  let adminMenuText = "ADMIN CONTROL PANEL:\n" +
+                      "1. Open Moderator Controls\n" +
+                      "2. Shut Down Room / Server\n" +
+                      "3. Toggle Global EMP Lock\n" +
+                      "Enter option:";
+  openModal(adminMenuText, (val) => {
+    let action = val.trim();
+    if (action === "1") {
+      handleModeratorMenu();
+    } else if (action === "2") {
+      if (gameLoopInterval) clearInterval(gameLoopInterval);
+      if (peer) peer.destroy();
+      currentScreen = "screen0";
+      setPersistentAnnouncement("ADMIN ACTION: Server shut down.");
+    } else if (action === "3") {
+      manualEmpLock = !manualEmpLock;
+      setPersistentAnnouncement("Admin EMP: " + (manualEmpLock ? "LOCKED" : "UNLOCKED"));
+    }
   });
 }
 
 function handleModeratorMenu() {
-  openModal("MODERATOR PANEL:\n1. Trigger Blackout", () => {
-    isBlackoutActive = true;
+  let modMenuText = "MODERATOR CONTROL PANEL:\n" +
+                    "1. Trigger Blackout Interrogation\n" +
+                    "2. Toggle Global EMP\n" +
+                    "Enter option:";
+  openModal(modMenuText, (val) => {
+    let action = val.trim();
+    if (action === "1") {
+      openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
+        let targetID = parseInt(tVal);
+        if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
+          blackoutTargetPlayer = targetID;
+          isBlackoutActive = true;
+        }
+      });
+    } else if (action === "2") {
+      manualEmpLock = !manualEmpLock;
+      setPersistentAnnouncement("Moderator EMP: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+    }
   });
 }
