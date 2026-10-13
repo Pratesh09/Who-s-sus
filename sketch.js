@@ -4,7 +4,7 @@ let currentRoomCode = "";
 let isHost = false;
 let playerNumber = 1;
 let totalPlayersCount = 4;
-let localUsername = "Pratesh09";
+let localUsername = "Player"; // Default ID set to Player
 
 // PeerJS Networking Variables
 let peer = null;
@@ -236,10 +236,7 @@ function drawStartScreen() {
   drawButton(width / 2 - 130, height / 2 - 50, 260, 40, "Create Multiplayer Room", color(52, 152, 219));
   drawButton(width / 2 - 130, height / 2, 260, 40, "Join Multiplayer Room", color(155, 89, 182));
   
-  // New Account Settings Button
   drawButton(width / 2 - 130, height / 2 + 50, 260, 38, "Account Settings", color(52, 73, 94));
-  
-  // Staff Assist Button
   drawButton(width / 2 - 80, height / 2 + 110, 160, 35, "Staff Assist", color(108, 122, 137));
 }
 
@@ -380,9 +377,10 @@ function drawGameplayScreen() {
     }
   }
 
+  // FIXED: Spectate button ONLY shows when player is actually dead (`!isPlayerAlive`) and not during hunter revenge
   if (hunterRevengePending) {
     drawButton(width / 2 - 110, height - 90, 220, 45, "Show Mercy (Spectate)", color(142, 68, 173));
-  } else if (!isPlayerAlive) {
+  } else if (!isPlayerAlive && !isSpectating) {
     drawButton(width / 2 - 90, height - 90, 180, 45, "Spectate Game", color(142, 68, 173));
   }
 
@@ -566,17 +564,14 @@ function mousePressed() {
   }
 
   if (currentScreen === "screen0") {
-    // Start Singleplayer
     if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
         mouseY >= height / 2 - 100 && mouseY <= height / 2 - 60) {
       startSingleplayer();
     }
-    // Create Multiplayer Room
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
              mouseY >= height / 2 - 50 && mouseY <= height / 2 - 10) {
       createMultiplayerRoom();
     }
-    // Join Multiplayer Room
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
              mouseY >= height / 2 && mouseY <= height / 2 + 40) {
       openModal("Enter Room Code to Join (e.g., ROOM-8315):", (val) => {
@@ -586,7 +581,6 @@ function mousePressed() {
         }
       });
     }
-    // Account Settings Button
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
              mouseY >= height / 2 + 50 && mouseY <= height / 2 + 88) {
       openModal("Enter your desired username:", (val) => {
@@ -598,7 +592,6 @@ function mousePressed() {
         }
       });
     }
-    // Staff Assist Button
     else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
              mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
       openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
@@ -606,6 +599,19 @@ function mousePressed() {
         if (parts.length === 2) {
           let enteredUser = parts[0].trim();
           let enteredCode = parts[1].trim();
+
+          let isBanned = false;
+          for (let b = 0; b < serverBannedUsers.length; b++) {
+            if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
+              isBanned = true;
+              break;
+            }
+          }
+
+          if (isBanned) {
+            setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
+            return;
+          }
 
           let lowerUser = enteredUser.toLowerCase();
           if (authorizedUsers[lowerUser] && enteredCode === "9315") {
@@ -676,7 +682,8 @@ function mousePressed() {
       handleDevMenu();
     }
 
-    if (!isPlayerAlive && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
+    // Spectate click event check
+    if (!isPlayerAlive && !isSpectating && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
         mouseY >= height - 90 && mouseY <= height - 45) {
       isSpectating = true;
       setPersistentAnnouncement("SPECTATING MODE: Watching the remaining players...");
@@ -1264,7 +1271,9 @@ function handleAdminMenu() {
   let adminMenuText = "ADMIN CONTROL PANEL:\n" +
                       "1. Open Moderator Controls\n" +
                       "2. Shut Down Room / Server\n" +
-                      "3. Toggle Global EMP Lock\n" +
+                      "3. Ban Player Username\n" +
+                      "4. Kick Player Username\n" +
+                      "5. Toggle Global EMP Lock\n" +
                       "Enter option:";
   openModal(adminMenuText, (val) => {
     let action = val.trim();
@@ -1276,6 +1285,22 @@ function handleAdminMenu() {
       currentScreen = "screen0";
       setPersistentAnnouncement("ADMIN ACTION: Server shut down.");
     } else if (action === "3") {
+      openModal("Enter username of player to BAN:", (targetUser) => {
+        let name = targetUser.trim();
+        if (name !== "") {
+          serverBannedUsers.push(name);
+          setPersistentAnnouncement("Admin Action: " + name + " has been BANNED.");
+        }
+      });
+    } else if (action === "4") {
+      openModal("Enter username of player to KICK:", (targetUser) => {
+        let name = targetUser.trim();
+        if (name !== "") {
+          serverKickedUsers.push(name);
+          setPersistentAnnouncement("Admin Action: " + name + " has been KICKED.");
+        }
+      });
+    } else if (action === "5") {
       manualEmpLock = !manualEmpLock;
       setPersistentAnnouncement("Admin EMP: " + (manualEmpLock ? "LOCKED" : "UNLOCKED"));
     }
@@ -1285,7 +1310,8 @@ function handleAdminMenu() {
 function handleModeratorMenu() {
   let modMenuText = "MODERATOR CONTROL PANEL:\n" +
                     "1. Trigger Blackout Interrogation\n" +
-                    "2. Toggle Global EMP\n" +
+                    "2. Kick Player Username\n" +
+                    "3. Toggle Global EMP\n" +
                     "Enter option:";
   openModal(modMenuText, (val) => {
     let action = val.trim();
@@ -1298,6 +1324,14 @@ function handleModeratorMenu() {
         }
       });
     } else if (action === "2") {
+      openModal("Enter username of player to KICK:", (targetUser) => {
+        let name = targetUser.trim();
+        if (name !== "") {
+          serverKickedUsers.push(name);
+          setPersistentAnnouncement("Mod Action: " + name + " has been KICKED.");
+        }
+      });
+    } else if (action === "3") {
       manualEmpLock = !manualEmpLock;
       setPersistentAnnouncement("Moderator EMP: " + (manualEmpLock ? "ACTIVE" : "OFF"));
     }
