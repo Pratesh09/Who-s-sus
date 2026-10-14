@@ -374,7 +374,6 @@ function drawGameplayScreen() {
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
     
-    // Bot roles only display when Dev Mode is explicitly toggled ON
     if (isDevModeActive) {
       fill(241, 196, 15);
       textSize(12);
@@ -652,7 +651,9 @@ function mousePressed() {
     }
 
     if (userRank !== "" && mouseX >= 20 && mouseX <= 150 && mouseY >= 20 && mouseY <= 55) {
-      handleStaffPortal();
+      if (userRank === "Dev") handleDevMenu();
+      else if (userRank === "Admin") handleAdminMenu();
+      else handleModeratorMenu();
       return;
     }
 
@@ -1299,9 +1300,9 @@ function viewSubmittedReports() {
   openModal(reportLog, () => {});
 }
 
-// Dev Menu also includes Admin & Moderator actions so Devs can do everything
+// Dev Menu includes full Developer, Admin, and Moderator controls
 function handleDevMenu() {
-  let devMenuText = "DEV CONTROL PANEL (FULL ACCESS):\n" +
+  let devMenuText = "DEV CONTROL PANEL (FULL STAFF ACCESS):\n" +
                     "1. Set Your Role (1-13)\n" +
                     "2. Kill AI Target (1-3)\n" +
                     "3. Kill Self\n" +
@@ -1309,7 +1310,8 @@ function handleDevMenu() {
                     "5. Guard/Protect Target (0-3)\n" +
                     "6. Set Altruist Mark Target\n" +
                     "7. Toggle Bot Roles Display\n" +
-                    "8. Open Admin / Mod Controls\n" +
+                    "8. Open Moderator Controls\n" +
+                    "9. Open Admin Controls\n" +
                     "Enter option:";
   openModal(devMenuText, (val) => {
     let option = val.trim();
@@ -1365,6 +1367,8 @@ function handleDevMenu() {
       isDevModeActive = !isDevModeActive;
       setPersistentAnnouncement("Bot Roles Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
     } else if (option === "8") {
+      handleModeratorMenu();
+    } else if (option === "9") {
       handleAdminMenu();
     }
   });
