@@ -81,7 +81,6 @@ let statusMessage = "Welcome to Social Deduction!";
 let endSummaryText = "";
 
 let targetCards = [];
-let modalActive = false;
 let gameLoopInterval = null;
 
 function getRoleName(roleNum) {
@@ -474,7 +473,7 @@ function getRoleColor(r) {
   }
 }
 
-// ==================== NATIVE MOBILE PROMPT ====================
+// ==================== NATIVE PROMPT ====================
 
 function openModal(promptText, callback) {
   let result = prompt(promptText);
@@ -597,37 +596,41 @@ function mousePressed() {
     }
     else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
              mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
-      openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
-        let parts = val.trim().split(":");
-        if (parts.length === 2) {
-          let enteredUser = parts[0].trim();
-          let enteredCode = parts[1].trim();
+      if (userRank !== "") {
+        openInteractiveStaffPanel();
+      } else {
+        openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
+          let parts = val.trim().split(":");
+          if (parts.length === 2) {
+            let enteredUser = parts[0].trim();
+            let enteredCode = parts[1].trim();
 
-          let isBanned = false;
-          for (let b = 0; b < serverBannedUsers.length; b++) {
-            if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
-              isBanned = true;
-              break;
+            let isBanned = false;
+            for (let b = 0; b < serverBannedUsers.length; b++) {
+              if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
+                isBanned = true;
+                break;
+              }
+            }
+
+            if (isBanned) {
+              setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
+              return;
+            }
+
+            let lowerUser = enteredUser.toLowerCase();
+            if (authorizedUsers[lowerUser] && enteredCode === "9315") {
+              localUsername = enteredUser;
+              userRank = authorizedUsers[lowerUser];
+              
+              if (userRank === "Dev") {
+                isDevModeActive = true;
+              }
+              openInteractiveStaffPanel();
             }
           }
-
-          if (isBanned) {
-            setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
-            return;
-          }
-
-          let lowerUser = enteredUser.toLowerCase();
-          if (authorizedUsers[lowerUser] && enteredCode === "9315") {
-            localUsername = enteredUser;
-            userRank = authorizedUsers[lowerUser];
-            
-            if (userRank === "Dev") {
-              isDevModeActive = true;
-            }
-            handleStaffPortal();
-          }
-        }
-      });
+        });
+      }
     }
   } else if (currentScreen === "multiplayer_lobby") {
     if (isHost && mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 &&
@@ -651,9 +654,7 @@ function mousePressed() {
     }
 
     if (userRank !== "" && mouseX >= 20 && mouseX <= 150 && mouseY >= 20 && mouseY <= 55) {
-      if (userRank === "Dev") handleDevMenu();
-      else if (userRank === "Admin") handleAdminMenu();
-      else handleModeratorMenu();
+      openInteractiveStaffPanel();
       return;
     }
 
@@ -1227,247 +1228,231 @@ function revealRoles() {
   }
 }
 
-// ==================== STAFF PORTAL, CHAT & REPORT SYSTEM ====================
+// ==================== INTERACTIVE STAFF PANEL (HTML/CSS MODAL) ====================
 
-function handleStaffPortal() {
-  let portalText = "STAFF PORTAL [" + userRank + " - " + localUsername + "]\n" +
-                   "1. Open Rank Control Panel (" + userRank + " Menu)\n" +
-                   "2. Open Staff Chat (" + staffChatMessages.length + " messages)\n" +
-                   "3. Report Player to Admin\n" +
-                   "4. View Submitted Reports (" + submittedReports.length + " reports)\n" +
-                   "Enter option:";
-  
-  openModal(portalText, (val) => {
-    let opt = val.trim();
-    if (opt === "1") {
-      if (userRank === "Dev") handleDevMenu();
-      else if (userRank === "Admin") handleAdminMenu();
-      else handleModeratorMenu();
-    } else if (opt === "2") {
-      handleStaffChat();
-    } else if (opt === "3") {
-      handleReportPlayer();
-    } else if (opt === "4") {
-      viewSubmittedReports();
-    }
-  });
-}
+function openInteractiveStaffPanel() {
+  let existingModal = document.getElementById("staffPanelContainer");
+  if (existingModal) existingModal.remove();
 
-function handleStaffChat() {
-  let chatHistory = "--- SECURE STAFF CHAT ---\n";
-  if (staffChatMessages.length === 0) {
-    chatHistory += "(No messages yet)\n";
-  } else {
-    for (let m of staffChatMessages) {
-      chatHistory += "[" + m.sender + "]: " + m.text + "\n";
-    }
-  }
-  chatHistory += "\nEnter new message to send:";
+  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
+  let isDev = (userRank === "Dev");
 
-  openModal(chatHistory, (msg) => {
-    let textMsg = msg.trim();
-    if (textMsg !== "") {
-      staffChatMessages.push({ sender: localUsername + " (" + userRank + ")", text: textMsg });
-      setPersistentAnnouncement("Staff Chat message sent!");
-    }
-  });
-}
+  let container = document.createElement("div");
+  container.id = "staffPanelContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 9999; font-family: sans-serif;
+  `;
 
-function handleReportPlayer() {
-  openModal("Enter the username of the player you want to report:", (targetUser) => {
-    let suspect = targetUser.trim();
-    if (suspect !== "") {
-      openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
-        let reason = reasonVal.trim();
-        if (reason !== "") {
-          submittedReports.push({ reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() });
-          setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
-        }
-      });
-    }
-  });
-}
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
+    max-height: 80vh; overflow-y: auto; text-align: left;
+  `;
 
-function viewSubmittedReports() {
-  let reportLog = "--- PENDING REPORTS LOG ---\n";
-  if (submittedReports.length === 0) {
-    reportLog += "No reports filed.";
-  } else {
-    for (let r of submittedReports) {
-      reportLog += "• " + r.suspect + " reported by " + r.reporter + "\n  Reason: " + r.reason + " (" + r.time + ")\n\n";
-    }
-  }
-  openModal(reportLog, () => {});
-}
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ STAFF ASSIST INTERACTIVE PANEL</h2>
+      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+    
+    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
+    </div>
 
-// Dev Menu includes full Developer, Admin, and Moderator controls
-function handleDevMenu() {
-  let devMenuText = "DEV CONTROL PANEL (FULL STAFF ACCESS):\n" +
-                    "1. Set Your Role (1-13)\n" +
-                    "2. Kill AI Target (1-3)\n" +
-                    "3. Kill Self\n" +
-                    "4. Revive Target (0 for You, 1-3 for AI)\n" +
-                    "5. Guard/Protect Target (0-3)\n" +
-                    "6. Set Altruist Mark Target\n" +
-                    "7. Toggle Bot Roles Display\n" +
-                    "8. Open Moderator Controls\n" +
-                    "9. Open Admin Controls\n" +
-                    "Enter option:";
-  openModal(devMenuText, (val) => {
-    let option = val.trim();
-    if (option === "1") {
-      openModal("Enter Role ID (1-13):\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (rVal) => {
-        let chosen = parseInt(rVal);
-        if (!isNaN(chosen) && chosen >= 1 && chosen <= 13) {
-          role = chosen;
-          setupRoleUI();
-        }
-      });
-    } else if (option === "2") {
-      openModal("Select AI Target to Kill (1 for Player 2, 2 for Player 3, 3 for Player 4):", (kVal) => {
-        let targetIdx = parseInt(kVal);
-        if (!isNaN(targetIdx) && targetIdx >= 1 && targetIdx <= 3) {
-          isTargetAlive[targetIdx - 1] = false;
-          targetCards[targetIdx - 1].borderColor = color(231, 76, 60);
-          notifyPlayerDeath(targetRoles[targetIdx - 1], targetIdx);
-          checkGameStatus();
-        }
-      });
-    } else if (option === "3") {
-      handlePlayerDeath();
-    } else if (option === "4") {
-      openModal("Select Player ID to Revive (0 for You, 1-3 for Players):", (revVal) => {
-        let revID = parseInt(revVal);
-        if (revID === 0) {
-          isPlayerAlive = true;
-          setPersistentAnnouncement("Dev Action: You have been revived!");
-        } else if (revID >= 1 && revID <= 3) {
-          isTargetAlive[revID - 1] = true;
-          targetCards[revID - 1].borderColor = color(180);
-          setPersistentAnnouncement("Dev Action: Player " + (revID + 1) + " revived!");
-        }
-      });
-    } else if (option === "5") {
-      openModal("Select Player ID to Guard/Protect (0 for You, 1-3 for Players):", (gVal) => {
-        let gID = parseInt(gVal);
-        if (!isNaN(gID) && gID >= 0 && gID <= 3) {
-          protectedPlayer = gID;
-          setPersistentAnnouncement("Dev Action: Player " + (gID === 0 ? "You" : (gID + 1)) + " is now guarded!");
-        }
-      });
-    } else if (option === "6") {
-      openModal("Set Altruist Target (1 for Player 2, 2 for Player 3, 3 for Player 4):", (altVal) => {
-        let aID = parseInt(altVal);
-        if (!isNaN(aID) && aID >= 1 && aID <= 3) {
-          altruistSelectedTarget = aID;
-          setPersistentAnnouncement("Dev Action: Altruist marked Player " + (aID + 1));
-        }
-      });
-    } else if (option === "7") {
-      isDevModeActive = !isDevModeActive;
-      setPersistentAnnouncement("Bot Roles Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
-    } else if (option === "8") {
-      handleModeratorMenu();
-    } else if (option === "9") {
-      handleAdminMenu();
-    }
-  });
-}
+    <!-- TAB BUTTONS -->
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Rank Controls</button>
+      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
+      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
+    </div>
 
-function handleAdminMenu() {
-  let adminMenuText = "ADMIN CONTROL PANEL:\n" +
-                      "1. Open Moderator Controls\n" +
-                      "2. Shut Down Room / Server\n" +
-                      "3. Ban Player Username\n" +
-                      "4. Kick Player Username\n" +
-                      "5. Mute Player Username\n" +
-                      "6. Toggle Global EMP Lock\n" +
-                      "Enter option:";
-  openModal(adminMenuText, (val) => {
-    let action = val.trim();
-    if (action === "1") {
-      handleModeratorMenu();
-    } else if (action === "2") {
+    <!-- CONTROLS SECTION -->
+    <div id="sectionControls">
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Global Server Controls</h3>
+      
+      ${isDevOrAdmin ? `
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Shut Down Active Server:</strong></span>
+        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN</button>
+      </div>
+      ` : ''}
+
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Global EMP Jammer:</strong></span>
+        <label style="position:relative; display:inline-block; width:44px; height:24px;">
+          <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
+          <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
+        </label>
+      </div>
+
+      ${isDev ? `
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Bot Roles Display:</strong></span>
+        <label style="position:relative; display:inline-block; width:44px; height:24px;">
+          <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
+          <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
+        </label>
+      </div>
+      ` : ''}
+
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Moderation Actions</h3>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <button id="btnBlackout" style="background:#d63031; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Blackout Interrogation</button>
+        <button id="btnKickPlayer" style="background:#e67e22; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Kick Player</button>
+        <button id="btnMutePlayer" style="background:#f39c12; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Mute Player</button>
+        <button id="btnDisableAbility" style="background:#8e44ad; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Disable Ability</button>
+      </div>
+    </div>
+
+    <!-- CHAT SECTION -->
+    <div id="sectionChat" style="display:none;">
+      <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
+        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('')}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
+        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">Send</button>
+      </div>
+    </div>
+
+    <!-- REPORTS SECTION -->
+    <div id="sectionReports" style="display:none;">
+      <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
+      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
+        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
+      </div>
+    </div>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  // EVENT HANDLERS
+  document.getElementById("closeStaffPanel").onclick = () => container.remove();
+
+  // Tab switching logic
+  let sControls = document.getElementById("sectionControls");
+  let sChat = document.getElementById("sectionChat");
+  let sReports = document.getElementById("sectionReports");
+  let tControls = document.getElementById("tabControls");
+  let tChat = document.getElementById("tabChat");
+  let tReports = document.getElementById("tabReports");
+
+  tControls.onclick = () => {
+    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none";
+    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72";
+  };
+  tChat.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none";
+    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72";
+  };
+  tReports.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block";
+    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
+  };
+
+  // Server Shutdown Button
+  if (isDevOrAdmin) {
+    document.getElementById("btnShutdownServer").onclick = () => {
       if (gameLoopInterval) clearInterval(gameLoopInterval);
       if (peer) peer.destroy();
       currentScreen = "screen0";
-      setPersistentAnnouncement("ADMIN ACTION: Server shut down.");
-    } else if (action === "3") {
-      openModal("Enter username of player to BAN:", (targetUser) => {
-        let name = targetUser.trim();
-        if (name !== "") {
-          serverBannedUsers.push(name);
-          setPersistentAnnouncement("Admin Action: " + name + " has been BANNED.");
-        }
-      });
-    } else if (action === "4") {
-      openModal("Enter username of player to KICK:", (targetUser) => {
-        let name = targetUser.trim();
-        if (name !== "") {
-          serverKickedUsers.push(name);
-          setPersistentAnnouncement("Admin Action: " + name + " has been KICKED.");
-        }
-      });
-    } else if (action === "5") {
-      openModal("Enter username of player to MUTE:", (targetUser) => {
-        let name = targetUser.trim();
-        if (name !== "") {
-          serverMutedUsers.push(name);
-          setPersistentAnnouncement("Admin Action: " + name + " has been MUTED.");
-        }
-      });
-    } else if (action === "6") {
-      manualEmpLock = !manualEmpLock;
-      setPersistentAnnouncement("Admin EMP: " + (manualEmpLock ? "LOCKED" : "UNLOCKED"));
-    }
-  });
-}
+      setPersistentAnnouncement("STAFF ACTION: All active room servers shut down!");
+      container.remove();
+    };
+  }
 
-function handleModeratorMenu() {
-  let modMenuText = "MODERATOR CONTROL PANEL:\n" +
-                    "1. Trigger Blackout Interrogation\n" +
-                    "2. Kick Player Username\n" +
-                    "3. Mute Player Username\n" +
-                    "4. Disable Target Player Role Ability\n" +
-                    "5. Toggle Global EMP\n" +
-                    "Enter option:";
-  openModal(modMenuText, (val) => {
-    let action = val.trim();
-    if (action === "1") {
-      openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
-        let targetID = parseInt(tVal);
-        if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
-          blackoutTargetPlayer = targetID;
-          isBlackoutActive = true;
-        }
-      });
-    } else if (action === "2") {
-      openModal("Enter username of player to KICK:", (targetUser) => {
-        let name = targetUser.trim();
-        if (name !== "") {
-          serverKickedUsers.push(name);
-          setPersistentAnnouncement("Mod Action: " + name + " has been KICKED.");
-        }
-      });
-    } else if (action === "3") {
-      openModal("Enter username of player to MUTE:", (targetUser) => {
-        let name = targetUser.trim();
-        if (name !== "") {
-          serverMutedUsers.push(name);
-          setPersistentAnnouncement("Mod Action: " + name + " has been MUTED.");
-        }
-      });
-    } else if (action === "4") {
-      openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
-        let dID = parseInt(dVal);
-        if (!isNaN(dID) && dID >= 0 && dID <= 3) {
-          disabledRolePlayers.push(dID);
-          setPersistentAnnouncement("Mod Action: Disabled ability for Player " + (dID === 0 ? "You" : (dID + 1)));
-        }
-      });
-    } else if (action === "5") {
-      manualEmpLock = !manualEmpLock;
-      setPersistentAnnouncement("Moderator EMP: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+  // Global EMP Switch
+  let toggleEmp = document.getElementById("toggleEmpSwitch");
+  if (toggleEmp) {
+    toggleEmp.onchange = (e) => {
+      manualEmpLock = e.target.checked;
+      document.getElementById("sliderEmp").style.backgroundColor = manualEmpLock ? '#00cec9' : '#636e72';
+      setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+    };
+  }
+
+  // Bot Roles Display Switch
+  let toggleBot = document.getElementById("toggleBotDisplaySwitch");
+  if (toggleBot) {
+    toggleBot.onchange = (e) => {
+      isDevModeActive = e.target.checked;
+      document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
+      setPersistentAnnouncement("Bot Roles Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
+    };
+  }
+
+  // Moderation buttons
+  document.getElementById("btnBlackout").onclick = () => {
+    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
+      let targetID = parseInt(tVal);
+      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
+        blackoutTargetPlayer = targetID;
+        isBlackoutActive = true;
+        container.remove();
+      }
+    });
+  };
+
+  document.getElementById("btnKickPlayer").onclick = () => {
+    openModal("Enter username of player to KICK:", (targetUser) => {
+      let name = targetUser.trim();
+      if (name !== "") {
+        serverKickedUsers.push(name);
+        setPersistentAnnouncement("Staff Action: " + name + " has been KICKED.");
+      }
+    });
+  };
+
+  document.getElementById("btnMutePlayer").onclick = () => {
+    openModal("Enter username of player to MUTE:", (targetUser) => {
+      let name = targetUser.trim();
+      if (name !== "") {
+        serverMutedUsers.push(name);
+        setPersistentAnnouncement("Staff Action: " + name + " has been MUTED.");
+      }
+    });
+  };
+
+  document.getElementById("btnDisableAbility").onclick = () => {
+    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
+      let dID = parseInt(dVal);
+      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
+        disabledRolePlayers.push(dID);
+        setPersistentAnnouncement("Staff Action: Disabled ability for Player " + (dID === 0 ? "You" : (dID + 1)));
+      }
+    });
+  };
+
+  // Staff Chat Message Sending
+  document.getElementById("btnSendChatMsg").onclick = () => {
+    let inp = document.getElementById("chatInputText");
+    let msg = inp.value.trim();
+    if (msg !== "") {
+      staffChatMessages.push({ sender: localUsername + " (" + userRank + ")", text: msg });
+      inp.value = "";
+      document.getElementById("chatHistoryBox").innerHTML = staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
     }
-  });
+  };
+
+  // Report Player
+  document.getElementById("btnReportNewPlayer").onclick = () => {
+    openModal("Enter the username of the player you want to report:", (targetUser) => {
+      let suspect = targetUser.trim();
+      if (suspect !== "") {
+        openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
+          let reason = reasonVal.trim();
+          if (reason !== "") {
+            submittedReports.push({ reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() });
+            setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
+            container.remove();
+          }
+        });
+      }
+    });
+  };
 }
