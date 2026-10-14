@@ -91,6 +91,18 @@ let selectedCardIndex = -1;
 let shuffleCards = [];
 let autoStartTimeout = null;
 
+// Sound Variable
+let emergencySound;
+
+function preload() {
+  soundFormats('mp3');
+  // Loads emergency.mp3 from root or assets folder (adjust path if needed)
+  emergencySound = loadSound('emergency.mp3', 
+    () => console.log("Emergency sound loaded successfully!"),
+    () => console.log("Could not load emergency sound.")
+  );
+}
+
 function getRoleName(roleNum) {
   return roleNames[roleNum - 1];
 }
@@ -1515,6 +1527,9 @@ function openInteractiveStaffPanel() {
       if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
         blackoutTargetPlayer = targetID;
         isBlackoutActive = true;
+        if (emergencySound && emergencySound.isLoaded()) {
+          emergencySound.play();
+        }
         container.remove();
       }
     });
