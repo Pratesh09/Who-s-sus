@@ -4,7 +4,7 @@ let currentRoomCode = "";
 let isHost = false;
 let playerNumber = 1;
 let totalPlayersCount = 4;
-let localUsername = "Player"; // Default ID set to Player
+let localUsername = "Player"; // Default ID
 
 // PeerJS Networking Variables
 let peer = null;
@@ -14,6 +14,10 @@ let connectedPeersList = [];
 let isDevModeActive = false;
 let userRank = ""; // "Dev", "Admin", or "Moderator"
 let showShieldIcon = false; 
+
+// Staff Portal State & Logs
+let staffChatMessages = [];
+let submittedReports = [];
 
 // Coordinates and radius for interactive shield clicking
 let shieldClickX = 0;
@@ -370,6 +374,7 @@ function drawGameplayScreen() {
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
     
+    // Bot roles only display when Dev Mode is explicitly toggled ON
     if (isDevModeActive) {
       fill(241, 196, 15);
       textSize(12);
@@ -377,7 +382,6 @@ function drawGameplayScreen() {
     }
   }
 
-  // FIXED: Spectate button ONLY shows when player is actually dead (`!isPlayerAlive`) and not during hunter revenge
   if (hunterRevengePending) {
     drawButton(width / 2 - 110, height - 90, 220, 45, "Show Mercy (Spectate)", color(142, 68, 173));
   } else if (!isPlayerAlive && !isSpectating) {
@@ -620,12 +624,8 @@ function mousePressed() {
             
             if (userRank === "Dev") {
               isDevModeActive = true;
-              handleDevMenu();
-            } else if (userRank === "Admin") {
-              handleAdminMenu();
-            } else if (userRank === "Moderator") {
-              handleModeratorMenu();
             }
+            handleStaffPortal();
           }
         }
       });
@@ -652,9 +652,7 @@ function mousePressed() {
     }
 
     if (userRank !== "" && mouseX >= 20 && mouseX <= 150 && mouseY >= 20 && mouseY <= 55) {
-      if (userRank === "Dev") handleDevMenu();
-      else if (userRank === "Admin") handleAdminMenu();
-      else handleModeratorMenu();
+      handleStaffPortal();
       return;
     }
 
@@ -677,12 +675,6 @@ function mousePressed() {
       }
     }
 
-    if (isDevModeActive && userRank === "Dev" && mouseX >= width - 140 && mouseX <= width - 20 &&
-        mouseY >= 20 && mouseY <= 55) {
-      handleDevMenu();
-    }
-
-    // Spectate click event check
     if (!isPlayerAlive && !isSpectating && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
         mouseY >= height - 90 && mouseY <= height - 45) {
       isSpectating = true;
@@ -1234,14 +1226,90 @@ function revealRoles() {
   }
 }
 
-// ==================== STAFF & DEV MENUS ====================
+// ==================== STAFF PORTAL, CHAT & REPORT SYSTEM ====================
 
+function handleStaffPortal() {
+  let portalText = "STAFF PORTAL [" + userRank + " - " + localUsername + "]\n" +
+                   "1. Open Rank Control Panel (" + userRank + " Menu)\n" +
+                   "2. Open Staff Chat (" + staffChatMessages.length + " messages)\n" +
+                   "3. Report Player to Admin\n" +
+                   "4. View Submitted Reports (" + submittedReports.length + " reports)\n" +
+                   "Enter option:";
+  
+  openModal(portalText, (val) => {
+    let opt = val.trim();
+    if (opt === "1") {
+      if (userRank === "Dev") handleDevMenu();
+      else if (userRank === "Admin") handleAdminMenu();
+      else handleModeratorMenu();
+    } else if (opt === "2") {
+      handleStaffChat();
+    } else if (opt === "3") {
+      handleReportPlayer();
+    } else if (opt === "4") {
+      viewSubmittedReports();
+    }
+  });
+}
+
+function handleStaffChat() {
+  let chatHistory = "--- SECURE STAFF CHAT ---\n";
+  if (staffChatMessages.length === 0) {
+    chatHistory += "(No messages yet)\n";
+  } else {
+    for (let m of staffChatMessages) {
+      chatHistory += "[" + m.sender + "]: " + m.text + "\n";
+    }
+  }
+  chatHistory += "\nEnter new message to send:";
+
+  openModal(chatHistory, (msg) => {
+    let textMsg = msg.trim();
+    if (textMsg !== "") {
+      staffChatMessages.push({ sender: localUsername + " (" + userRank + ")", text: textMsg });
+      setPersistentAnnouncement("Staff Chat message sent!");
+    }
+  });
+}
+
+function handleReportPlayer() {
+  openModal("Enter the username of the player you want to report:", (targetUser) => {
+    let suspect = targetUser.trim();
+    if (suspect !== "") {
+      openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
+        let reason = reasonVal.trim();
+        if (reason !== "") {
+          submittedReports.push({ reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() });
+          setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
+        }
+      });
+    }
+  });
+}
+
+function viewSubmittedReports() {
+  let reportLog = "--- PENDING REPORTS LOG ---\n";
+  if (submittedReports.length === 0) {
+    reportLog += "No reports filed.";
+  } else {
+    for (let r of submittedReports) {
+      reportLog += "• " + r.suspect + " reported by " + r.reporter + "\n  Reason: " + r.reason + " (" + r.time + ")\n\n";
+    }
+  }
+  openModal(reportLog, () => {});
+}
+
+// Dev Menu also includes Admin & Moderator actions so Devs can do everything
 function handleDevMenu() {
-  let devMenuText = "DEV CONTROL PANEL:\n" +
-                    "1. Choose Role (1-13)\n" +
-                    "2. Kill Self\n" +
-                    "3. Revive/Guard Target\n" +
-                    "4. Toggle Shield Icon\n" +
+  let devMenuText = "DEV CONTROL PANEL (FULL ACCESS):\n" +
+                    "1. Set Your Role (1-13)\n" +
+                    "2. Kill AI Target (1-3)\n" +
+                    "3. Kill Self\n" +
+                    "4. Revive Target (0 for You, 1-3 for AI)\n" +
+                    "5. Guard/Protect Target (0-3)\n" +
+                    "6. Set Altruist Mark Target\n" +
+                    "7. Toggle Bot Roles Display\n" +
+                    "8. Open Admin / Mod Controls\n" +
                     "Enter option:";
   openModal(devMenuText, (val) => {
     let option = val.trim();
@@ -1254,15 +1322,50 @@ function handleDevMenu() {
         }
       });
     } else if (option === "2") {
-      handlePlayerDeath();
+      openModal("Select AI Target to Kill (1 for Player 2, 2 for Player 3, 3 for Player 4):", (kVal) => {
+        let targetIdx = parseInt(kVal);
+        if (!isNaN(targetIdx) && targetIdx >= 1 && targetIdx <= 3) {
+          isTargetAlive[targetIdx - 1] = false;
+          targetCards[targetIdx - 1].borderColor = color(231, 76, 60);
+          notifyPlayerDeath(targetRoles[targetIdx - 1], targetIdx);
+          checkGameStatus();
+        }
+      });
     } else if (option === "3") {
-      isTargetAlive = [true, true, true];
-      isPlayerAlive = true;
-      setupRoleUI();
-      setPersistentAnnouncement("Dev Action: All players revived!");
+      handlePlayerDeath();
     } else if (option === "4") {
-      showShieldIcon = !showShieldIcon;
-      setPersistentAnnouncement("Shield toggled: " + (showShieldIcon ? "ON" : "OFF"));
+      openModal("Select Player ID to Revive (0 for You, 1-3 for Players):", (revVal) => {
+        let revID = parseInt(revVal);
+        if (revID === 0) {
+          isPlayerAlive = true;
+          setPersistentAnnouncement("Dev Action: You have been revived!");
+        } else if (revID >= 1 && revID <= 3) {
+          isTargetAlive[revID - 1] = true;
+          targetCards[revID - 1].borderColor = color(180);
+          setPersistentAnnouncement("Dev Action: Player " + (revID + 1) + " revived!");
+        }
+      });
+    } else if (option === "5") {
+      openModal("Select Player ID to Guard/Protect (0 for You, 1-3 for Players):", (gVal) => {
+        let gID = parseInt(gVal);
+        if (!isNaN(gID) && gID >= 0 && gID <= 3) {
+          protectedPlayer = gID;
+          setPersistentAnnouncement("Dev Action: Player " + (gID === 0 ? "You" : (gID + 1)) + " is now guarded!");
+        }
+      });
+    } else if (option === "6") {
+      openModal("Set Altruist Target (1 for Player 2, 2 for Player 3, 3 for Player 4):", (altVal) => {
+        let aID = parseInt(altVal);
+        if (!isNaN(aID) && aID >= 1 && aID <= 3) {
+          altruistSelectedTarget = aID;
+          setPersistentAnnouncement("Dev Action: Altruist marked Player " + (aID + 1));
+        }
+      });
+    } else if (option === "7") {
+      isDevModeActive = !isDevModeActive;
+      setPersistentAnnouncement("Bot Roles Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
+    } else if (option === "8") {
+      handleAdminMenu();
     }
   });
 }
@@ -1273,7 +1376,8 @@ function handleAdminMenu() {
                       "2. Shut Down Room / Server\n" +
                       "3. Ban Player Username\n" +
                       "4. Kick Player Username\n" +
-                      "5. Toggle Global EMP Lock\n" +
+                      "5. Mute Player Username\n" +
+                      "6. Toggle Global EMP Lock\n" +
                       "Enter option:";
   openModal(adminMenuText, (val) => {
     let action = val.trim();
@@ -1301,6 +1405,14 @@ function handleAdminMenu() {
         }
       });
     } else if (action === "5") {
+      openModal("Enter username of player to MUTE:", (targetUser) => {
+        let name = targetUser.trim();
+        if (name !== "") {
+          serverMutedUsers.push(name);
+          setPersistentAnnouncement("Admin Action: " + name + " has been MUTED.");
+        }
+      });
+    } else if (action === "6") {
       manualEmpLock = !manualEmpLock;
       setPersistentAnnouncement("Admin EMP: " + (manualEmpLock ? "LOCKED" : "UNLOCKED"));
     }
@@ -1311,7 +1423,9 @@ function handleModeratorMenu() {
   let modMenuText = "MODERATOR CONTROL PANEL:\n" +
                     "1. Trigger Blackout Interrogation\n" +
                     "2. Kick Player Username\n" +
-                    "3. Toggle Global EMP\n" +
+                    "3. Mute Player Username\n" +
+                    "4. Disable Target Player Role Ability\n" +
+                    "5. Toggle Global EMP\n" +
                     "Enter option:";
   openModal(modMenuText, (val) => {
     let action = val.trim();
@@ -1332,6 +1446,22 @@ function handleModeratorMenu() {
         }
       });
     } else if (action === "3") {
+      openModal("Enter username of player to MUTE:", (targetUser) => {
+        let name = targetUser.trim();
+        if (name !== "") {
+          serverMutedUsers.push(name);
+          setPersistentAnnouncement("Mod Action: " + name + " has been MUTED.");
+        }
+      });
+    } else if (action === "4") {
+      openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
+        let dID = parseInt(dVal);
+        if (!isNaN(dID) && dID >= 0 && dID <= 3) {
+          disabledRolePlayers.push(dID);
+          setPersistentAnnouncement("Mod Action: Disabled ability for Player " + (dID === 0 ? "You" : (dID + 1)));
+        }
+      });
+    } else if (action === "5") {
       manualEmpLock = !manualEmpLock;
       setPersistentAnnouncement("Moderator EMP: " + (manualEmpLock ? "ACTIVE" : "OFF"));
     }
