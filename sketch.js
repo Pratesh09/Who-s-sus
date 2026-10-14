@@ -83,6 +83,14 @@ let endSummaryText = "";
 let targetCards = [];
 let gameLoopInterval = null;
 
+// Shuffle & Role Reveal Animation Variables
+let shuffleTimer = 0;
+let isShuffling = true;
+let hasSelectedCard = false;
+let selectedCardIndex = -1;
+let shuffleCards = [];
+let autoStartTimeout = null;
+
 function getRoleName(roleNum) {
   return roleNames[roleNum - 1];
 }
@@ -114,6 +122,7 @@ function updateLocalUserRank() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   setupTargetCardBounds();
+  setupShuffleCards();
 }
 
 function draw() {
@@ -285,19 +294,114 @@ function drawMultiplayerLobbyScreen() {
   drawButton(width / 2 - 90, height / 2 + 190, 180, 38, "Leave Room", color(231, 76, 60));
 }
 
+// ==================== CARD SHUFFLE & ROLE REVEAL SCREEN ====================
+
+function setupShuffleCards() {
+  let cardW = 120;
+  let cardH = 170;
+  let spacing = 30;
+  let totalW = (cardW * 3) + (spacing * 2);
+  let startX = (width - totalW) / 2;
+  let startY = height / 2 - 40;
+
+  shuffleCards = [
+    { x: startX, y: startY, w: cardW, h: cardH, offset: 0 },
+    { x: startX + cardW + spacing, y: startY, w: cardW, h: cardH, offset: 0 },
+    { x: startX + (cardW + spacing) * 2, y: startY, w: cardW, h: cardH, offset: 0 }
+  ];
+}
+
+function startShufflePhase() {
+  isShuffling = true;
+  hasSelectedCard = false;
+  selectedCardIndex = -1;
+  shuffleTimer = 0;
+  setupShuffleCards();
+
+  if (autoStartTimeout) clearTimeout(autoStartTimeout);
+}
+
 function drawRoleRevealScreen() {
   fill(241, 196, 15);
   textSize(28);
   textStyle(BOLD);
-  text("YOUR ROLE IS:", width / 2, height / 2 - 80);
 
-  textSize(46);
-  fill(getRoleColor(role));
-  text(getRoleName(role), width / 2, height / 2);
+  if (isShuffling) {
+    text("SHUFFLING ROLES...", width / 2, height / 2 - 160);
+    shuffleTimer += 0.08;
 
-  textSize(18);
-  fill(200);
-  text("Game starting shortly...", width / 2, height / 2 + 80);
+    for (let i = 0; i < 3; i++) {
+      let card = shuffleCards[i];
+      let offsetX = sin(shuffleTimer * 3 + i) * 35;
+      
+      stroke(0, 184, 148);
+      strokeWeight(3);
+      fill(45, 52, 54);
+      rect(card.x + offsetX, card.y, card.w, card.h, 10);
+      
+      stroke(0, 184, 148, 120);
+      strokeWeight(1.5);
+      line(card.x + offsetX + 10, card.y + 10, card.x + offsetX + card.w - 10, card.y + card.h - 10);
+      line(card.x + offsetX + card.w - 10, card.y + 10, card.x + offsetX + 10, card.y + card.h - 10);
+    }
+
+    if (shuffleTimer > 10) {
+      isShuffling = false;
+    }
+  } else if (!hasSelectedCard) {
+    text("PICK A CARD TO REVEAL YOUR ROLE", width / 2, height / 2 - 160);
+
+    for (let i = 0; i < 3; i++) {
+      let card = shuffleCards[i];
+
+      let isHover = mouseX >= card.x && mouseX <= card.x + card.w &&
+                    mouseY >= card.y && mouseY <= card.y + card.h;
+
+      stroke(isHover ? color(241, 196, 15) : color(0, 184, 148));
+      strokeWeight(isHover ? 4 : 3);
+      fill(isHover ? color(60, 70, 75) : color(45, 52, 54));
+      rect(card.x, card.y + (isHover ? -8 : 0), card.w, card.h, 10);
+
+      fill(255);
+      noStroke();
+      textSize(28);
+      text("?", card.x + card.w / 2, card.y + card.h / 2 + (isHover ? -8 : 0));
+    }
+  } else {
+    text("YOUR ASSIGNED ROLE IS:", width / 2, height / 2 - 160);
+
+    for (let i = 0; i < 3; i++) {
+      let card = shuffleCards[i];
+
+      if (i === selectedCardIndex) {
+        stroke(getRoleColor(role));
+        strokeWeight(4);
+        fill(35, 40, 45);
+        rect(card.x, card.y - 12, card.w, card.h, 10);
+
+        fill(getRoleColor(role));
+        noStroke();
+        textSize(16);
+        textStyle(BOLD);
+        text(getRoleName(role), card.x + card.w / 2, card.y + card.h / 2 - 12);
+      } else {
+        stroke(100);
+        strokeWeight(2);
+        fill(30, 30, 30);
+        rect(card.x, card.y, card.w, card.h, 10);
+
+        fill(120);
+        noStroke();
+        textSize(12);
+        text("Hidden", card.x + card.w / 2, card.y + card.h / 2);
+      }
+    }
+
+    fill(200);
+    textSize(18);
+    textStyle(NORMAL);
+    text("Game starting shortly...", width / 2, height / 2 + 150);
+  }
 }
 
 function drawGameplayScreen() {
@@ -382,8 +486,8 @@ function drawGameplayScreen() {
 
   if (hunterRevengePending) {
     drawButton(width / 2 - 110, height - 90, 220, 45, "Show Mercy (Spectate)", color(142, 68, 173));
-  } else if (!isPlayerAlive && !isSpectating) {
-    drawButton(width / 2 - 90, height - 90, 180, 45, "Spectate Game", color(142, 68, 173));
+  } else if (!isPlayerAlive) {
+    drawButton(width / 2 - 90, height - 90, 180, 45, isSpectating ? "Spectating..." : "Spectate Game", color(142, 68, 173));
   }
 
   if (userRank !== "") {
@@ -414,7 +518,17 @@ function drawVectorShield(x, y, size, shieldCol) {
 }
 
 function drawEndScreen() {
-  fill(231, 76, 60);
+  let headingColor = color(231, 76, 60); // Default Red for Killer
+
+  if (currentScreen === "screen5") {
+    headingColor = color(52, 152, 219); // Blue for Town/Citizens
+  } else if (currentScreen === "screen6") {
+    headingColor = color(241, 196, 15); // Chrome Yellow for Jester
+  } else if (currentScreen === "screen8") {
+    headingColor = color(142, 68, 173); // Purple for Witch
+  }
+
+  fill(headingColor);
   textSize(36);
   textStyle(BOLD);
   text("GAME OVER", width / 2, 80);
@@ -547,6 +661,10 @@ function setupConnectionHandlers() {
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
+  if (document.getElementById("staffPanelContainer")) {
+    return;
+  }
+
   if (isBlackoutActive) {
     if (mouseX >= width / 2 - 210 && mouseX <= width / 2 - 20 &&
         mouseY >= height - 100 && mouseY <= height - 60) {
@@ -643,6 +761,23 @@ function mousePressed() {
       currentScreen = "screen0";
       statusMessage = "Left room " + currentRoomCode;
     }
+  } else if (currentScreen === "Role_screen") {
+    if (!isShuffling && !hasSelectedCard) {
+      for (let i = 0; i < 3; i++) {
+        let card = shuffleCards[i];
+        if (mouseX >= card.x && mouseX <= card.x + card.w &&
+            mouseY >= card.y && mouseY <= card.y + card.h) {
+          hasSelectedCard = true;
+          selectedCardIndex = i;
+
+          autoStartTimeout = setTimeout(() => {
+            currentScreen = "screen2";
+            if (!isMultiplayer) startRoleGameLoop();
+          }, 2500);
+          break;
+        }
+      }
+    }
   } else if (currentScreen === "screen2") {
     if (userRank !== "") {
       let d = dist(mouseX, mouseY, shieldClickX, shieldClickY);
@@ -664,9 +799,15 @@ function mousePressed() {
         hunterRevengePending = false;
         setPersistentAnnouncement("Hunter showed mercy and didn't execute anyone!");
         isSpectating = true;
-        currentScreen = "screen3";
         return;
       }
+    }
+
+    if (!isPlayerAlive && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
+        mouseY >= height - 90 && mouseY <= height - 45) {
+      isSpectating = true;
+      setPersistentAnnouncement("SPECTATING MODE: Watching the remaining players...");
+      return;
     }
 
     for (let i = 0; i < 3; i++) {
@@ -675,12 +816,6 @@ function mousePressed() {
           mouseY >= card.y && mouseY <= card.y + card.h) {
         handleRoleAction(i + 1, i);
       }
-    }
-
-    if (!isPlayerAlive && !isSpectating && mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
-        mouseY >= height - 90 && mouseY <= height - 45) {
-      isSpectating = true;
-      setPersistentAnnouncement("SPECTATING MODE: Watching the remaining players...");
     }
   } else if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
     if (mouseX >= width / 2 - 100 && mouseX <= width / 2 + 100 &&
@@ -711,7 +846,7 @@ function startMultiplayerGame() {
 
   setupRoleUI();
   currentScreen = "Role_screen";
-  setTimeout(() => { currentScreen = "screen2"; }, 3000);
+  startShufflePhase();
 }
 
 function startMultiplayerMatchFromServer(data) {
@@ -719,7 +854,7 @@ function startMultiplayerMatchFromServer(data) {
   targetRoles = data.targets;
   setupRoleUI();
   currentScreen = "Role_screen";
-  setTimeout(() => { currentScreen = "screen2"; }, 3000);
+  startShufflePhase();
 }
 
 function startSingleplayer() {
@@ -748,11 +883,7 @@ function startSingleplayer() {
   setupRoleUI();
 
   currentScreen = "Role_screen";
-
-  setTimeout(() => {
-    currentScreen = "screen2";
-    startRoleGameLoop();
-  }, 3000);
+  startShufflePhase();
 }
 
 function setupSingleplayerRoles() {
@@ -836,10 +967,6 @@ function handleRoleAction(targetNum, cardIndex) {
     } else {
       setPersistentAnnouncement("Hunter revenge-shot Player " + (targetNum + 1) + " (" + getRoleName(tRole) + ")!");
       checkGameStatus();
-
-      if (currentScreen === "screen2") {
-        currentScreen = "screen3";
-      }
     }
     return;
   }
@@ -1007,10 +1134,6 @@ function handlePlayerDeath() {
   }
   
   checkGameStatus();
-
-  if (!isPlayerAlive && currentScreen === "screen2") {
-    currentScreen = "screen3";
-  }
 }
 
 function triggerHunterRevenge(victimID) {
@@ -1245,6 +1368,10 @@ function openInteractiveStaffPanel() {
     z-index: 9999; font-family: sans-serif;
   `;
 
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
   let panel = document.createElement("div");
   panel.style.cssText = `
     background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
@@ -1334,7 +1461,6 @@ function openInteractiveStaffPanel() {
   // EVENT HANDLERS
   document.getElementById("closeStaffPanel").onclick = () => container.remove();
 
-  // Tab switching logic
   let sControls = document.getElementById("sectionControls");
   let sChat = document.getElementById("sectionChat");
   let sReports = document.getElementById("sectionReports");
@@ -1355,7 +1481,6 @@ function openInteractiveStaffPanel() {
     tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
   };
 
-  // Server Shutdown Button
   if (isDevOrAdmin) {
     document.getElementById("btnShutdownServer").onclick = () => {
       if (gameLoopInterval) clearInterval(gameLoopInterval);
@@ -1366,7 +1491,6 @@ function openInteractiveStaffPanel() {
     };
   }
 
-  // Global EMP Switch
   let toggleEmp = document.getElementById("toggleEmpSwitch");
   if (toggleEmp) {
     toggleEmp.onchange = (e) => {
@@ -1376,7 +1500,6 @@ function openInteractiveStaffPanel() {
     };
   }
 
-  // Bot Roles Display Switch
   let toggleBot = document.getElementById("toggleBotDisplaySwitch");
   if (toggleBot) {
     toggleBot.onchange = (e) => {
@@ -1386,7 +1509,6 @@ function openInteractiveStaffPanel() {
     };
   }
 
-  // Moderation buttons
   document.getElementById("btnBlackout").onclick = () => {
     openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
       let targetID = parseInt(tVal);
@@ -1428,7 +1550,6 @@ function openInteractiveStaffPanel() {
     });
   };
 
-  // Staff Chat Message Sending
   document.getElementById("btnSendChatMsg").onclick = () => {
     let inp = document.getElementById("chatInputText");
     let msg = inp.value.trim();
@@ -1439,7 +1560,6 @@ function openInteractiveStaffPanel() {
     }
   };
 
-  // Report Player
   document.getElementById("btnReportNewPlayer").onclick = () => {
     openModal("Enter the username of the player you want to report:", (targetUser) => {
       let suspect = targetUser.trim();
