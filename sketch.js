@@ -250,9 +250,8 @@ function drawStartScreen() {
   
   drawButton(width / 2 - 130, height / 2 + 50, 260, 38, "Account Settings", color(52, 73, 94));
   
-  // DUAL STAFF BUTTONS ON MAIN MENU
-  drawButton(width / 2 - 160, height / 2 + 110, 150, 35, "In-Game Controls", color(108, 122, 137));
-  drawButton(width / 2 + 10, height / 2 + 110, 150, 35, "Staff Portal", color(41, 128, 185));
+  // SINGLE STAFF ASSIST BUTTON ON MAIN HOME SCREEN
+  drawButton(width / 2 - 80, height / 2 + 110, 160, 35, "Staff Assist", color(108, 122, 137));
 }
 
 function drawMultiplayerLobbyScreen() {
@@ -493,6 +492,7 @@ function drawGameplayScreen() {
     drawButton(width / 2 - 90, height - 90, 180, 45, isSpectating ? "Spectating..." : "Spectate Game", color(142, 68, 173));
   }
 
+  // TWO SEPARATE BUTTONS DISPLAYED IN-GAME
   if (userRank !== "") {
     drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
     drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
@@ -747,15 +747,7 @@ function mousePressed() {
         }
       });
     }
-    else if (mouseX >= width / 2 - 160 && mouseX <= width / 2 - 10 &&
-             mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
-      if (userRank !== "") {
-        openInGameControlsPanel();
-      } else {
-        triggerStaffCredentialsPrompt(() => openInGameControlsPanel());
-      }
-    }
-    else if (mouseX >= width / 2 + 10 && mouseX <= width / 2 + 160 &&
+    else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
              mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
       if (userRank !== "") {
         openInteractiveStaffPanel();
