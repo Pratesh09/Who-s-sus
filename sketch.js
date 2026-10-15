@@ -11,7 +11,7 @@ let peer = null;
 let conn = null;
 let connectedPeersList = [];
 
-let isDevModeActive = false;
+let isDevModeActive = false; // Off by default (can be toggled in Staff Panel)
 let userRank = ""; // "Dev", "Admin", or "Moderator"
 let showShieldIcon = false; 
 
@@ -96,7 +96,6 @@ let emergencySound;
 
 function preload() {
   soundFormats('mp3');
-  // Loads emergency.mp3 from root or assets folder (adjust path if needed)
   emergencySound = loadSound('emergency.mp3', 
     () => console.log("Emergency sound loaded successfully!"),
     () => console.log("Could not load emergency sound.")
@@ -753,9 +752,6 @@ function mousePressed() {
               localUsername = enteredUser;
               userRank = authorizedUsers[lowerUser];
               
-              if (userRank === "Dev") {
-                isDevModeActive = true;
-              }
               openInteractiveStaffPanel();
             }
           }
@@ -871,7 +867,7 @@ function startMultiplayerMatchFromServer(data) {
 
 function startSingleplayer() {
   isMultiplayer = false;
-  isDevModeActive = (userRank === "Dev");
+  isDevModeActive = false; // Off by default
   showShieldIcon = false;
   playerNumber = 1;
   totalPlayersCount = 4;
