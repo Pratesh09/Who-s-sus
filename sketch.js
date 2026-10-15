@@ -96,14 +96,15 @@ let emergencySound;
 
 function preload() {
   soundFormats('mp3');
-  emergencySound = loadSound('emergency.mp3', 
-    () => console.log("Emergency sound loaded successfully!"),
-    () => console.log("Could not load emergency sound.")
-  );
-}
-
-function getRoleName(roleNum) {
-  return roleNames[roleNum - 1];
+  // Safe loading: won't crash if the file isn't uploaded yet
+  try {
+    emergencySound = loadSound('emergency.mp3', 
+      () => console.log("Emergency sound loaded successfully!"),
+      (err) => console.log("Sound load failed, but game will still run.")
+    );
+  } catch (e) {
+    console.log("Sound library error bypassed.");
+  }
 }
 
 function setPersistentAnnouncement(msg) {
