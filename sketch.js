@@ -11,7 +11,7 @@ let peer = null;
 let conn = null;
 let connectedPeersList = [];
 
-let isDevModeActive = false; // Off by default (can be toggled in Staff Panel)
+let isDevModeActive = false; // Off by default (can be toggled in Dev Sandbox)
 let userRank = ""; // "Dev", "Admin", or "Moderator"
 let showShieldIcon = false; 
 
@@ -249,7 +249,10 @@ function drawStartScreen() {
   drawButton(width / 2 - 130, height / 2, 260, 40, "Join Multiplayer Room", color(155, 89, 182));
   
   drawButton(width / 2 - 130, height / 2 + 50, 260, 38, "Account Settings", color(52, 73, 94));
-  drawButton(width / 2 - 80, height / 2 + 110, 160, 35, "Staff Assist", color(108, 122, 137));
+  
+  // DUAL STAFF BUTTONS ON MAIN MENU
+  drawButton(width / 2 - 160, height / 2 + 110, 150, 35, "In-Game Controls", color(108, 122, 137));
+  drawButton(width / 2 + 10, height / 2 + 110, 150, 35, "Staff Portal", color(41, 128, 185));
 }
 
 function drawMultiplayerLobbyScreen() {
@@ -491,13 +494,8 @@ function drawGameplayScreen() {
   }
 
   if (userRank !== "") {
-    let menuBtnColor;
-    if (userRank === "Dev") menuBtnColor = color(52, 152, 219);
-    else if (userRank === "Admin") menuBtnColor = color(155, 89, 182);
-    else menuBtnColor = color(46, 204, 113);
-
-    let menuLabel = userRank + " Menu";
-    drawButton(20, 20, 130, 35, menuLabel, menuBtnColor);
+    drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
+    drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
   }
 }
 
@@ -596,7 +594,7 @@ function openModal(promptText, callback) {
   }
 }
 
-function triggerStaffCredentialsPrompt() {
+function triggerStaffCredentialsPrompt(targetCallback) {
   openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
     let parts = val.trim().split(":");
     if (parts.length === 2) {
@@ -621,6 +619,7 @@ function triggerStaffCredentialsPrompt() {
         localUsername = enteredUser;
         userRank = authorizedUsers[lowerUser];
         setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
+        if (targetCallback) targetCallback();
       } else {
         setPersistentAnnouncement("INVALID CREDENTIALS!");
       }
@@ -693,7 +692,7 @@ function setupConnectionHandlers() {
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
-  if (document.getElementById("staffPanelContainer")) {
+  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer")) {
     return;
   }
 
@@ -748,12 +747,20 @@ function mousePressed() {
         }
       });
     }
-    else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
+    else if (mouseX >= width / 2 - 160 && mouseX <= width / 2 - 10 &&
+             mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
+      if (userRank !== "") {
+        openInGameControlsPanel();
+      } else {
+        triggerStaffCredentialsPrompt(() => openInGameControlsPanel());
+      }
+    }
+    else if (mouseX >= width / 2 + 10 && mouseX <= width / 2 + 160 &&
              mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
       if (userRank !== "") {
         openInteractiveStaffPanel();
       } else {
-        triggerStaffCredentialsPrompt();
+        triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
       }
     }
   } else if (currentScreen === "multiplayer_lobby") {
@@ -794,7 +801,12 @@ function mousePressed() {
       }
     }
 
-    if (userRank !== "" && mouseX >= 20 && mouseX <= 150 && mouseY >= 20 && mouseY <= 55) {
+    if (userRank !== "" && mouseX >= 20 && mouseX <= 160 && mouseY >= 20 && mouseY <= 55) {
+      openInGameControlsPanel();
+      return;
+    }
+
+    if (userRank !== "" && mouseX >= 170 && mouseX <= 290 && mouseY >= 20 && mouseY <= 55) {
       openInteractiveStaffPanel();
       return;
     }
@@ -1357,7 +1369,116 @@ function revealRoles() {
   }
 }
 
-// ==================== INTERACTIVE STAFF PANEL (HTML/CSS MODAL) ====================
+// ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
+
+function openInGameControlsPanel() {
+  let existing = document.getElementById("inGameControlsContainer");
+  if (existing) existing.remove();
+
+  let container = document.createElement("div");
+  container.id = "inGameControlsContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 9999; font-family: sans-serif;
+  `;
+
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
+    text-align: left;
+  `;
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION CONTROLS</h2>
+      <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+    
+    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+      <button id="btnIgBlackout" style="background:#d63031; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🚨 Blackout Interrogation</button>
+      <button id="btnIgMute" style="background:#f39c12; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🔇 Mute Player</button>
+      <button id="btnIgBan" style="background:#c0392b; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">⛔ Ban Player</button>
+      <button id="btnIgKick" style="background:#e67e22; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🥾 Kick Player</button>
+    </div>
+    
+    <div style="margin-top:10px;">
+      <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
+    </div>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeIgPanel").onclick = () => container.remove();
+
+  document.getElementById("btnIgBlackout").onclick = () => {
+    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
+      let targetID = parseInt(tVal);
+      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
+        blackoutTargetPlayer = targetID;
+        isBlackoutActive = true;
+        container.remove();
+      }
+    });
+  };
+
+  document.getElementById("btnIgMute").onclick = () => {
+    openModal("Enter username of player to MUTE:", (targetUser) => {
+      let name = targetUser.trim();
+      if (name !== "") {
+        serverMutedUsers.push(name);
+        setPersistentAnnouncement("In-Game Action: " + name + " has been MUTED.");
+        container.remove();
+      }
+    });
+  };
+
+  document.getElementById("btnIgBan").onclick = () => {
+    openModal("Enter username of player to BAN:", (targetUser) => {
+      let name = targetUser.trim();
+      if (name !== "") {
+        serverBannedUsers.push(name);
+        setPersistentAnnouncement("In-Game Action: " + name + " HAS BEEN BANNED!");
+        container.remove();
+      }
+    });
+  };
+
+  document.getElementById("btnIgKick").onclick = () => {
+    openModal("Enter username of player to KICK:", (targetUser) => {
+      let name = targetUser.trim();
+      if (name !== "") {
+        serverKickedUsers.push(name);
+        setPersistentAnnouncement("In-Game Action: " + name + " has been KICKED.");
+        container.remove();
+      }
+    });
+  };
+
+  document.getElementById("btnIgEmp").onclick = () => {
+    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
+      let dID = parseInt(dVal);
+      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
+        disabledRolePlayers.push(dID);
+        setPersistentAnnouncement("In-Game Action: EMP jammed ability for Player " + (dID === 0 ? "You" : (dID + 1)));
+        container.remove();
+      }
+    });
+  };
+}
+
+// ==================== PANEL 2: STAFF PORTAL MODAL ====================
 
 function openInteractiveStaffPanel() {
   let existingModal = document.getElementById("staffPanelContainer");
@@ -1387,7 +1508,7 @@ function openInteractiveStaffPanel() {
 
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ STAFF ASSIST INTERACTIVE PANEL</h2>
+      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
       <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
     </div>
     
@@ -1397,7 +1518,7 @@ function openInteractiveStaffPanel() {
 
     <!-- TAB BUTTONS -->
     <div style="display:flex; gap:10px; margin-bottom:15px;">
-      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Rank Controls</button>
+      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Portal Controls</button>
       <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
       <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
     </div>
@@ -1408,36 +1529,33 @@ function openInteractiveStaffPanel() {
       
       ${isDevOrAdmin ? `
       <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Shut Down Active Server:</strong></span>
-        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN</button>
+        <span><strong>Shut Down Active Servers:</strong></span>
+        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN ALL</button>
       </div>
       ` : ''}
 
       <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Global EMP Jammer:</strong></span>
+        <span><strong>Global EMP Jammer Switch:</strong></span>
         <label style="position:relative; display:inline-block; width:44px; height:24px;">
           <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
           <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
         </label>
       </div>
 
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Features</h3>
       ${isDev ? `
       <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Bot Roles Display:</strong></span>
+        <span><strong>Dev Sandbox (View Bot Roles):</strong></span>
         <label style="position:relative; display:inline-block; width:44px; height:24px;">
           <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
           <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
         </label>
       </div>
-      ` : ''}
-
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Moderation Actions</h3>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-        <button id="btnBlackout" style="background:#d63031; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Blackout Interrogation</button>
-        <button id="btnKickPlayer" style="background:#e67e22; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Kick Player</button>
-        <button id="btnMutePlayer" style="background:#f39c12; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Mute Player</button>
-        <button id="btnDisableAbility" style="background:#8e44ad; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:13px;">Disable Ability</button>
+      ` : `
+      <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
+        🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
       </div>
+      `}
     </div>
 
     <!-- CHAT SECTION -->
@@ -1511,50 +1629,9 @@ function openInteractiveStaffPanel() {
     toggleBot.onchange = (e) => {
       isDevModeActive = e.target.checked;
       document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Bot Roles Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
+      setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
     };
   }
-
-  document.getElementById("btnBlackout").onclick = () => {
-    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
-      let targetID = parseInt(tVal);
-      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
-        blackoutTargetPlayer = targetID;
-        isBlackoutActive = true;
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnKickPlayer").onclick = () => {
-    openModal("Enter username of player to KICK:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverKickedUsers.push(name);
-        setPersistentAnnouncement("Staff Action: " + name + " has been KICKED.");
-      }
-    });
-  };
-
-  document.getElementById("btnMutePlayer").onclick = () => {
-    openModal("Enter username of player to MUTE:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverMutedUsers.push(name);
-        setPersistentAnnouncement("Staff Action: " + name + " has been MUTED.");
-      }
-    });
-  };
-
-  document.getElementById("btnDisableAbility").onclick = () => {
-    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
-      let dID = parseInt(dVal);
-      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
-        disabledRolePlayers.push(dID);
-        setPersistentAnnouncement("Staff Action: Disabled ability for Player " + (dID === 0 ? "You" : (dID + 1)));
-      }
-    });
-  };
 
   document.getElementById("btnSendChatMsg").onclick = () => {
     let inp = document.getElementById("chatInputText");
