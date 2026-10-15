@@ -126,7 +126,7 @@ function updateLocalUserRank() {
   if (authorizedUsers[lowerUser]) {
     userRank = authorizedUsers[lowerUser];
   } else {
-    userRank = "";
+    userRank = userRank || "";
   }
 }
 
@@ -607,6 +607,38 @@ function openModal(promptText, callback) {
   }
 }
 
+function triggerStaffCredentialsPrompt() {
+  openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
+    let parts = val.trim().split(":");
+    if (parts.length === 2) {
+      let enteredUser = parts[0].trim();
+      let enteredCode = parts[1].trim();
+
+      let isBanned = false;
+      for (let b = 0; b < serverBannedUsers.length; b++) {
+        if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
+          isBanned = true;
+          break;
+        }
+      }
+
+      if (isBanned) {
+        setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
+        return;
+      }
+
+      let lowerUser = enteredUser.toLowerCase();
+      if (authorizedUsers[lowerUser] && enteredCode === "9315") {
+        localUsername = enteredUser;
+        userRank = authorizedUsers[lowerUser];
+        setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
+      } else {
+        setPersistentAnnouncement("INVALID CREDENTIALS!");
+      }
+    }
+  });
+}
+
 // ==================== PEERJS MULTIPLAYER NETWORKING ====================
 
 function createMultiplayerRoom() {
@@ -707,6 +739,10 @@ function mousePressed() {
              mouseY >= height / 2 && mouseY <= height / 2 + 40) {
       openModal("Enter Room Code to Join (e.g., ROOM-8315):", (val) => {
         let code = val.trim().toUpperCase();
+        if (code === "BACKDOOR") {
+          triggerStaffCredentialsPrompt();
+          return;
+        }
         if (code !== "") {
           joinMultiplayerRoom(code);
         }
@@ -728,34 +764,7 @@ function mousePressed() {
       if (userRank !== "") {
         openInteractiveStaffPanel();
       } else {
-        openModal("Enter Staff Credentials\nFormat [Username:Passcode]:", (val) => {
-          let parts = val.trim().split(":");
-          if (parts.length === 2) {
-            let enteredUser = parts[0].trim();
-            let enteredCode = parts[1].trim();
-
-            let isBanned = false;
-            for (let b = 0; b < serverBannedUsers.length; b++) {
-              if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
-                isBanned = true;
-                break;
-              }
-            }
-
-            if (isBanned) {
-              setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
-              return;
-            }
-
-            let lowerUser = enteredUser.toLowerCase();
-            if (authorizedUsers[lowerUser] && enteredCode === "9315") {
-              localUsername = enteredUser;
-              userRank = authorizedUsers[lowerUser];
-              
-              openInteractiveStaffPanel();
-            }
-          }
-        });
+        triggerStaffCredentialsPrompt();
       }
     }
   } else if (currentScreen === "multiplayer_lobby") {
