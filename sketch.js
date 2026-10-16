@@ -4,15 +4,18 @@ let currentRoomCode = "";
 let isHost = false;
 let playerNumber = 1;
 let totalPlayersCount = 4;
-let localUsername = "Player"; // Default ID
+
+// LOAD PERSISTED USERNAME OR DEFAULT TO "Player"
+let localUsername = localStorage.getItem("game_localUsername") || "Player";
 
 // PeerJS Networking Variables
 let peer = null;
 let conn = null;
 let connectedPeersList = [];
+let activePeerConnections = [];
 
-let isDevModeActive = false; // Off by default (can be toggled in Dev Sandbox)
-let userRank = ""; // "Dev", "Admin", or "Moderator"
+let isDevModeActive = false;
+let userRank = "";
 let showShieldIcon = false; 
 
 // Staff Portal State & Logs
@@ -90,6 +93,12 @@ let hasSelectedCard = false;
 let selectedCardIndex = -1;
 let shuffleCards = [];
 let autoStartTimeout = null;
+
+function saveUsername(newName) {
+  localUsername = newName;
+  localStorage.setItem("game_localUsername", newName);
+  updateLocalUserRank();
+}
 
 function getRoleName(roleNum) {
   return roleNames[roleNum - 1];
@@ -237,21 +246,24 @@ function drawStartScreen() {
   fill(255);
   textSize(36);
   textStyle(BOLD);
-  text("13-Role Social Deduction", width / 2, height / 2 - 180);
+  text("13-Role Social Deduction", width / 2, height / 2 - 200);
 
   textSize(16);
   textStyle(NORMAL);
   fill(200);
-  text("Player: " + localUsername + (userRank ? " (" + userRank + ")" : ""), width / 2, height / 2 - 135);
+  text("Player: " + localUsername + (userRank ? " (" + userRank + ")" : ""), width / 2, height / 2 - 155);
 
-  drawButton(width / 2 - 130, height / 2 - 100, 260, 40, "Start Singleplayer", color(46, 204, 113));
-  drawButton(width / 2 - 130, height / 2 - 50, 260, 40, "Create Multiplayer Room", color(52, 152, 219));
-  drawButton(width / 2 - 130, height / 2, 260, 40, "Join Multiplayer Room", color(155, 89, 182));
+  drawButton(width / 2 - 130, height / 2 - 120, 260, 40, "Start Singleplayer", color(46, 204, 113));
+  drawButton(width / 2 - 130, height / 2 - 70, 260, 40, "Create Multiplayer Room", color(52, 152, 219));
+  drawButton(width / 2 - 130, height / 2 - 20, 260, 40, "Join Multiplayer Room", color(155, 89, 182));
   
-  drawButton(width / 2 - 130, height / 2 + 50, 260, 38, "Account Settings", color(52, 73, 94));
+  drawButton(width / 2 - 130, height / 2 + 30, 260, 38, "Account Settings", color(52, 73, 94));
   
-  // SINGLE STAFF ASSIST BUTTON ON MAIN HOME SCREEN
-  drawButton(width / 2 - 80, height / 2 + 110, 160, 35, "Staff Assist", color(108, 122, 137));
+  // CREDITS BUTTON
+  drawButton(width / 2 - 130, height / 2 + 75, 260, 35, "Credits", color(230, 126, 34));
+
+  // STAFF ASSIST BUTTON
+  drawButton(width / 2 - 80, height / 2 + 120, 160, 35, "Staff Assist", color(108, 122, 137));
 }
 
 function drawMultiplayerLobbyScreen() {
@@ -264,10 +276,14 @@ function drawMultiplayerLobbyScreen() {
   textSize(22);
   text("Room Code: " + currentRoomCode, width / 2, height / 2 - 90);
 
+  fill(220);
+  textSize(15);
+  text(statusMessage, width / 2, height / 2 - 60);
+
   fill(200);
   textSize(16);
   textStyle(NORMAL);
-  text("Connected Players in Room:", width / 2, height / 2 - 40);
+  text("Connected Players in Room:", width / 2, height / 2 - 25);
 
   let playersList = [localUsername + " (You - " + (isHost ? "Host" : "Player") + ")"];
   for (let p of connectedPeersList) {
@@ -277,23 +293,23 @@ function drawMultiplayerLobbyScreen() {
   for (let i = 0; i < 4; i++) {
     fill(45, 52, 54);
     stroke(100);
-    rect(width / 2 - 150, height / 2 + (i * 35) - 20, 300, 30, 6);
+    rect(width / 2 - 150, height / 2 + (i * 35) - 5, 300, 30, 6);
     noStroke();
     
     fill(i < playersList.length ? color(255) : color(120));
     textSize(14);
-    text(i < playersList.length ? playersList[i] : "Waiting for player...", width / 2, height / 2 + (i * 35) - 5);
+    text(i < playersList.length ? playersList[i] : "Waiting for player...", width / 2, height / 2 + (i * 35) + 10);
   }
 
   if (isHost) {
-    drawButton(width / 2 - 110, height / 2 + 130, 220, 45, "Start Match", color(46, 204, 113));
+    drawButton(width / 2 - 110, height / 2 + 150, 220, 45, "Start Match", color(46, 204, 113));
   } else {
     fill(200);
     textSize(15);
-    text("Waiting for host to start the match...", width / 2, height / 2 + 150);
+    text("Waiting for host to start the match...", width / 2, height / 2 + 170);
   }
 
-  drawButton(width / 2 - 90, height / 2 + 190, 180, 38, "Leave Room", color(231, 76, 60));
+  drawButton(width / 2 - 90, height / 2 + 210, 180, 38, "Leave Room", color(231, 76, 60));
 }
 
 // ==================== CARD SHUFFLE & ROLE REVEAL SCREEN ====================
@@ -492,7 +508,6 @@ function drawGameplayScreen() {
     drawButton(width / 2 - 90, height - 90, 180, 45, isSpectating ? "Spectating..." : "Spectate Game", color(142, 68, 173));
   }
 
-  // TWO SEPARATE BUTTONS DISPLAYED IN-GAME
   if (userRank !== "") {
     drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
     drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
@@ -516,14 +531,14 @@ function drawVectorShield(x, y, size, shieldCol) {
 }
 
 function drawEndScreen() {
-  let headingColor = color(231, 76, 60); // Default Red for Killer
+  let headingColor = color(231, 76, 60);
 
   if (currentScreen === "screen5") {
-    headingColor = color(52, 152, 219); // Blue for Town/Citizens
+    headingColor = color(52, 152, 219);
   } else if (currentScreen === "screen6") {
-    headingColor = color(241, 196, 15); // Chrome Yellow for Jester
+    headingColor = color(241, 196, 15);
   } else if (currentScreen === "screen8") {
-    headingColor = color(142, 68, 173); // Purple for Witch
+    headingColor = color(142, 68, 173);
   }
 
   fill(headingColor);
@@ -616,7 +631,7 @@ function triggerStaffCredentialsPrompt(targetCallback) {
 
       let lowerUser = enteredUser.toLowerCase();
       if (authorizedUsers[lowerUser] && enteredCode === "9315") {
-        localUsername = enteredUser;
+        saveUsername(enteredUser);
         userRank = authorizedUsers[lowerUser];
         setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
         if (targetCallback) targetCallback();
@@ -627,72 +642,207 @@ function triggerStaffCredentialsPrompt(targetCallback) {
   });
 }
 
-// ==================== PEERJS MULTIPLAYER NETWORKING ====================
+// ==================== CREDITS MODAL ====================
+
+function openCreditsPanel() {
+  let existing = document.getElementById("creditsPanelContainer");
+  if (existing) existing.remove();
+
+  let container = document.createElement("div");
+  container.id = "creditsPanelContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 10000; font-family: sans-serif;
+  `;
+
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 25px rgba(230,126,34,0.5); border: 2px solid #e67e22;
+    text-align: center;
+  `;
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:20px; color:#e67e22;">📜 GAME CREDITS</h2>
+      <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+
+    <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px;">
+      <p style="margin:0 0 8px 0;"><strong>Head Developer:</strong> Pratesh Gaikwad</p>
+      <p style="margin:0 0 8px 0;"><strong>Assistant Developer:</strong> Chinmay</p>
+      <p style="margin:0 0 8px 0;"><strong>Drawings & Art:</strong> Heramb</p>
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      <p style="margin:0 0 6px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
+      <p style="margin:0 0 10px 0; font-size:13px; color:#b2bec3;"><strong>Hosted on:</strong> GitHub Pages</p>
+      <p style="margin:0; font-size:12px; color:#718093; text-align:center;">© 2026 CodeAI Project Team. All rights reserved.</p>
+    </div>
+
+    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">Awesome!</button>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeCreditsPanel").onclick = () => container.remove();
+  document.getElementById("btnCreditsOk").onclick = () => container.remove();
+}
+
+// ==================== ROBUST PEERJS MULTIPLAYER NETWORKING ====================
 
 function createMultiplayerRoom() {
   currentRoomCode = "ROOM-" + floor(random(1000, 9999));
-  peer = new Peer(currentRoomCode);
+  
+  peer = new Peer(currentRoomCode, {
+    host: '0.peerjs.com',
+    port: 443,
+    secure: true,
+    debug: 2
+  });
 
   peer.on('open', (id) => {
     isMultiplayer = true;
     isHost = true;
     connectedPeersList = [];
+    activePeerConnections = [];
     currentScreen = "multiplayer_lobby";
-    statusMessage = "Hosting room: " + id;
+    statusMessage = "Room created successfully! Waiting for players...";
   });
 
   peer.on('connection', (incomingConn) => {
-    conn = incomingConn;
-    setupConnectionHandlers();
-    connectedPeersList.push("Player (Connected)");
-    statusMessage = "Another player joined the room!";
+    activePeerConnections.push(incomingConn);
+    setupPeerConnectionHandlers(incomingConn);
+    statusMessage = "A player connected to your room!";
   });
 
   peer.on('error', (err) => {
-    statusMessage = "Room creation error. Try again.";
-    console.error(err);
+    statusMessage = "Peer error: " + err.type;
+    console.error("Peer error:", err);
   });
 }
 
 function joinMultiplayerRoom(code) {
-  peer = new Peer();
+  statusMessage = "Connecting to " + code + "...";
+  currentScreen = "multiplayer_lobby";
+  isMultiplayer = true;
+  isHost = false;
+  currentRoomCode = code;
+
+  peer = new Peer({
+    host: '0.peerjs.com',
+    port: 443,
+    secure: true,
+    debug: 2
+  });
 
   peer.on('open', () => {
-    conn = peer.connect(code);
+    conn = peer.connect(code, { reliable: true });
     
     conn.on('open', () => {
-      isMultiplayer = true;
-      isHost = false;
-      currentRoomCode = code;
-      currentScreen = "multiplayer_lobby";
       statusMessage = "Connected to room: " + code;
-      setupConnectionHandlers();
+      setupPeerConnectionHandlers(conn);
       conn.send({ type: "JOIN", name: localUsername });
     });
 
     conn.on('error', (err) => {
-      statusMessage = "Could not connect to room code.";
+      statusMessage = "Connection failed. Check room code.";
       console.error(err);
     });
   });
+
+  peer.on('error', (err) => {
+    statusMessage = "Could not connect to broker server.";
+    console.error(err);
+  });
 }
 
-function setupConnectionHandlers() {
-  conn.on('data', (data) => {
+function broadcastData(data) {
+  if (isHost) {
+    for (let c of activePeerConnections) {
+      if (c && c.open) {
+        c.send(data);
+      }
+    }
+  } else if (conn && conn.open) {
+    conn.send(data);
+  }
+}
+
+function setupPeerConnectionHandlers(targetConn) {
+  targetConn.on('data', (data) => {
     if (data.type === "JOIN") {
-      connectedPeersList.push(data.name);
+      if (!connectedPeersList.includes(data.name)) {
+        connectedPeersList.push(data.name);
+      }
+      statusMessage = data.name + " joined the room!";
+      
+      if (isHost) {
+        broadcastData({ type: "SYNC_PEERS", list: connectedPeersList });
+      }
+    } else if (data.type === "SYNC_PEERS") {
+      connectedPeersList = data.list;
     } else if (data.type === "START_GAME") {
       startMultiplayerMatchFromServer(data.roleData);
     } else if (data.type === "ACTION") {
       handleRoleAction(data.targetNum, data.cardIndex);
+    } else if (data.type === "STAFF_CHAT") {
+      staffChatMessages.push(data.message);
+      updateStaffChatDOM();
+    } else if (data.type === "STAFF_REPORT") {
+      submittedReports.push(data.report);
+      updateStaffReportsDOM();
+    }
+
+    if (isHost) {
+      for (let c of activePeerConnections) {
+        if (c !== targetConn && c.open) {
+          c.send(data);
+        }
+      }
     }
   });
+
+  targetConn.on('close', () => {
+    statusMessage = "A peer disconnected.";
+  });
+}
+
+function updateStaffChatDOM() {
+  let box = document.getElementById("chatHistoryBox");
+  if (box) {
+    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+  let tabChatBtn = document.getElementById("tabChat");
+  if (tabChatBtn) {
+    tabChatBtn.innerText = `Staff Chat (${staffChatMessages.length})`;
+  }
+}
+
+function updateStaffReportsDOM() {
+  let repBox = document.getElementById("sectionReports");
+  if (repBox) {
+    let listDiv = repBox.querySelector("div:last-child");
+    if (listDiv) {
+      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
+    }
+  }
+  let tabRepBtn = document.getElementById("tabReports");
+  if (tabRepBtn) {
+    tabRepBtn.innerText = `Reports (${submittedReports.length})`;
+  }
 }
 
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
-  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer")) {
+  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer")) {
     return;
   }
 
@@ -716,15 +866,15 @@ function mousePressed() {
 
   if (currentScreen === "screen0") {
     if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-        mouseY >= height / 2 - 100 && mouseY <= height / 2 - 60) {
+        mouseY >= height / 2 - 120 && mouseY <= height / 2 - 80) {
       startSingleplayer();
     }
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 - 50 && mouseY <= height / 2 - 10) {
+             mouseY >= height / 2 - 70 && mouseY <= height / 2 - 30) {
       createMultiplayerRoom();
     }
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 && mouseY <= height / 2 + 40) {
+             mouseY >= height / 2 - 20 && mouseY <= height / 2 + 20) {
       openModal("Enter Room Code to Join (e.g., ROOM-8315):", (val) => {
         let code = val.trim().toUpperCase();
         if (code === "BACKDOOR") {
@@ -737,18 +887,21 @@ function mousePressed() {
       });
     }
     else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
-             mouseY >= height / 2 + 50 && mouseY <= height / 2 + 88) {
+             mouseY >= height / 2 + 30 && mouseY <= height / 2 + 68) {
       openModal("Enter your desired username:", (val) => {
         let newName = val.trim();
         if (newName !== "") {
-          localUsername = newName;
-          updateLocalUserRank();
+          saveUsername(newName);
           setPersistentAnnouncement("Username updated to: " + localUsername);
         }
       });
     }
+    else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 &&
+             mouseY >= height / 2 + 75 && mouseY <= height / 2 + 110) {
+      openCreditsPanel();
+    }
     else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 &&
-             mouseY >= height / 2 + 110 && mouseY <= height / 2 + 145) {
+             mouseY >= height / 2 + 120 && mouseY <= height / 2 + 155) {
       if (userRank !== "") {
         openInteractiveStaffPanel();
       } else {
@@ -757,12 +910,13 @@ function mousePressed() {
     }
   } else if (currentScreen === "multiplayer_lobby") {
     if (isHost && mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 &&
-        mouseY >= height / 2 + 130 && mouseY <= height / 2 + 175) {
+        mouseY >= height / 2 + 150 && mouseY <= height / 2 + 195) {
       startMultiplayerGame();
     }
     else if (mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 &&
-             mouseY >= height / 2 + 190 && mouseY <= height / 2 + 228) {
+             mouseY >= height / 2 + 210 && mouseY <= height / 2 + 248) {
       if (peer) peer.destroy();
+      isMultiplayer = false;
       currentScreen = "screen0";
       statusMessage = "Left room " + currentRoomCode;
     }
@@ -847,12 +1001,10 @@ function touchStarted() {
 function startMultiplayerGame() {
   setupSingleplayerRoles();
   
-  if (conn && conn.open) {
-    conn.send({
-      type: "START_GAME",
-      roleData: { role: targetRoles[0], targets: [role, targetRoles[1], targetRoles[2]] }
-    });
-  }
+  broadcastData({
+    type: "START_GAME",
+    roleData: { role: targetRoles[0], targets: [role, targetRoles[1], targetRoles[2]] }
+  });
 
   setupRoleUI();
   currentScreen = "Role_screen";
@@ -890,7 +1042,7 @@ function resetSingleplayerState() {
 }
 
 function startSingleplayer() {
-  isDevModeActive = false; // Off by default in standard mode
+  isDevModeActive = false;
   resetSingleplayerState();
   setupSingleplayerRoles();
   setupRoleUI();
@@ -900,14 +1052,14 @@ function startSingleplayer() {
 }
 
 function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
-  isDevModeActive = true; // Auto-enable bot role display in debug mode
+  isDevModeActive = true;
   resetSingleplayerState();
   
   role = devRole;
   targetRoles = [bot1Role, bot2Role, bot3Role];
 
   setupRoleUI();
-  currentScreen = "screen2"; // Skip shuffle phase and jump straight into gameplay for quick testing
+  currentScreen = "screen2";
   startRoleGameLoop();
   setPersistentAnnouncement("DEV DEBUG MODE ACTIVE: Testing as " + getRoleName(role));
 }
@@ -1402,7 +1554,7 @@ function openDevRoleTesterPanel() {
     text-align: left;
   `;
 
-  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
+  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}.${rName}</option>`).join('');
 
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
@@ -1439,335 +1591,4 @@ function openDevRoleTesterPanel() {
       <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 4 Role (Player 4):</label>
       <select id="selBot3Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
-      </select>
-    </div>
-
-    <button id="btnStartDevMatch" style="background:#00b894; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">▶ START DEBUG MATCH</button>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  // Set default selections
-  document.getElementById("selMyRole").value = "1";    // Killer
-  document.getElementById("selBot1Role").value = "3"; // Sheriff
-  document.getElementById("selBot2Role").value = "4"; // Doctor
-  document.getElementById("selBot3Role").value = "8"; // Hunter
-
-  document.getElementById("closeDevTester").onclick = () => container.remove();
-
-  document.getElementById("btnStartDevMatch").onclick = () => {
-    let myR = parseInt(document.getElementById("selMyRole").value);
-    let b1R = parseInt(document.getElementById("selBot1Role").value);
-    let b2R = parseInt(document.getElementById("selBot2Role").value);
-    let b3R = parseInt(document.getElementById("selBot3Role").value);
-
-    container.remove();
-    let staffModal = document.getElementById("staffPanelContainer");
-    if (staffModal) staffModal.remove();
-
-    launchDevDebugMode(myR, b1R, b2R, b3R);
-  };
-}
-
-// ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
-
-function openInGameControlsPanel() {
-  let existing = document.getElementById("inGameControlsContainer");
-  if (existing) existing.remove();
-
-  let container = document.createElement("div");
-  container.id = "inGameControlsContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  container.onclick = (e) => e.stopPropagation();
-  container.onmousedown = (e) => e.stopPropagation();
-  container.ontouchstart = (e) => e.stopPropagation();
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
-    text-align: left;
-  `;
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION CONTROLS</h2>
-      <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <button id="btnIgBlackout" style="background:#d63031; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🚨 Blackout Interrogation</button>
-      <button id="btnIgMute" style="background:#f39c12; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🔇 Mute Player</button>
-      <button id="btnIgBan" style="background:#c0392b; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">⛔ Ban Player</button>
-      <button id="btnIgKick" style="background:#e67e22; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🥾 Kick Player</button>
-    </div>
-    
-    <div style="margin-top:10px;">
-      <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeIgPanel").onclick = () => container.remove();
-
-  document.getElementById("btnIgBlackout").onclick = () => {
-    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
-      let targetID = parseInt(tVal);
-      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
-        blackoutTargetPlayer = targetID;
-        isBlackoutActive = true;
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgMute").onclick = () => {
-    openModal("Enter username of player to MUTE:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverMutedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been MUTED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgBan").onclick = () => {
-    openModal("Enter username of player to BAN:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverBannedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " HAS BEEN BANNED!");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgKick").onclick = () => {
-    openModal("Enter username of player to KICK:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverKickedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been KICKED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgEmp").onclick = () => {
-    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
-      let dID = parseInt(dVal);
-      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
-        disabledRolePlayers.push(dID);
-        setPersistentAnnouncement("In-Game Action: EMP jammed ability for Player " + (dID === 0 ? "You" : (dID + 1)));
-        container.remove();
-      }
-    });
-  };
-}
-
-// ==================== PANEL 2: STAFF PORTAL MODAL ====================
-
-function openInteractiveStaffPanel() {
-  let existingModal = document.getElementById("staffPanelContainer");
-  if (existingModal) existingModal.remove();
-
-  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
-  let isDev = (userRank === "Dev");
-
-  let container = document.createElement("div");
-  container.id = "staffPanelContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  container.onclick = (e) => e.stopPropagation();
-  container.onmousedown = (e) => e.stopPropagation();
-  container.ontouchstart = (e) => e.stopPropagation();
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
-    max-height: 80vh; overflow-y: auto; text-align: left;
-  `;
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
-      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-
-    <!-- TAB BUTTONS -->
-    <div style="display:flex; gap:10px; margin-bottom:15px;">
-      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Portal Controls</button>
-      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
-      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
-    </div>
-
-    <!-- CONTROLS SECTION -->
-    <div id="sectionControls">
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Global Server Controls</h3>
-      
-      ${isDevOrAdmin ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Shut Down Active Servers:</strong></span>
-        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN ALL</button>
-      </div>
-      ` : ''}
-
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Global EMP Jammer Switch:</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Features</h3>
-      ${isDev ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Dev Sandbox (View Bot Roles):</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-      <div style="margin-top:10px;">
-        <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🧪 Launch Dev Role Tester</button>
-      </div>
-      ` : `
-      <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
-        🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
-      </div>
-      `}
-    </div>
-
-    <!-- CHAT SECTION -->
-    <div id="sectionChat" style="display:none;">
-      <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
-        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('')}
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
-        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">Send</button>
-      </div>
-    </div>
-
-    <!-- REPORTS SECTION -->
-    <div id="sectionReports" style="display:none;">
-      <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
-      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
-        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
-      </div>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  // EVENT HANDLERS
-  document.getElementById("closeStaffPanel").onclick = () => container.remove();
-
-  let sControls = document.getElementById("sectionControls");
-  let sChat = document.getElementById("sectionChat");
-  let sReports = document.getElementById("sectionReports");
-  let tControls = document.getElementById("tabControls");
-  let tChat = document.getElementById("tabChat");
-  let tReports = document.getElementById("tabReports");
-
-  tControls.onclick = () => {
-    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none";
-    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72";
-  };
-  tChat.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none";
-    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72";
-  };
-  tReports.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block";
-    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
-  };
-
-  if (isDevOrAdmin) {
-    document.getElementById("btnShutdownServer").onclick = () => {
-      if (gameLoopInterval) clearInterval(gameLoopInterval);
-      if (peer) peer.destroy();
-      currentScreen = "screen0";
-      setPersistentAnnouncement("STAFF ACTION: All active room servers shut down!");
-      container.remove();
-    };
-  }
-
-  let toggleEmp = document.getElementById("toggleEmpSwitch");
-  if (toggleEmp) {
-    toggleEmp.onchange = (e) => {
-      manualEmpLock = e.target.checked;
-      document.getElementById("sliderEmp").style.backgroundColor = manualEmpLock ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
-    };
-  }
-
-  let toggleBot = document.getElementById("toggleBotDisplaySwitch");
-  if (toggleBot) {
-    toggleBot.onchange = (e) => {
-      isDevModeActive = e.target.checked;
-      document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
-    };
-  }
-
-  let btnDevTester = document.getElementById("btnOpenDevTester");
-  if (btnDevTester) {
-    btnDevTester.onclick = () => {
-      openDevRoleTesterPanel();
-    };
-  }
-
-  document.getElementById("btnSendChatMsg").onclick = () => {
-    let inp = document.getElementById("chatInputText");
-    let msg = inp.value.trim();
-    if (msg !== "") {
-      staffChatMessages.push({ sender: localUsername + " (" + userRank + ")", text: msg });
-      inp.value = "";
-      document.getElementById("chatHistoryBox").innerHTML = staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
-    }
-  };
-
-  document.getElementById("btnReportNewPlayer").onclick = () => {
-    openModal("Enter the username of the player you want to report:", (targetUser) => {
-      let suspect = targetUser.trim();
-      if (suspect !== "") {
-        openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
-          let reason = reasonVal.trim();
-          if (reason !== "") {
-            submittedReports.push({ reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() });
-            setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
-            container.remove();
-          }
-        });
-      }
-    });
-  };
-}
+      </
