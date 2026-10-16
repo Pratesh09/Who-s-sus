@@ -692,7 +692,7 @@ function setupConnectionHandlers() {
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
-  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer")) {
+  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer")) {
     return;
   }
 
@@ -867,9 +867,8 @@ function startMultiplayerMatchFromServer(data) {
   startShufflePhase();
 }
 
-function startSingleplayer() {
+function resetSingleplayerState() {
   isMultiplayer = false;
-  isDevModeActive = false; // Off by default
   showShieldIcon = false;
   playerNumber = 1;
   totalPlayersCount = 4;
@@ -888,12 +887,29 @@ function startSingleplayer() {
   disabledRolePlayers = [];
   altruistSelectedTarget = null;
   announcementHoldTimer = 0;
+}
 
+function startSingleplayer() {
+  isDevModeActive = false; // Off by default in standard mode
+  resetSingleplayerState();
   setupSingleplayerRoles();
   setupRoleUI();
 
   currentScreen = "Role_screen";
   startShufflePhase();
+}
+
+function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
+  isDevModeActive = true; // Auto-enable bot role display in debug mode
+  resetSingleplayerState();
+  
+  role = devRole;
+  targetRoles = [bot1Role, bot2Role, bot3Role];
+
+  setupRoleUI();
+  currentScreen = "screen2"; // Skip shuffle phase and jump straight into gameplay for quick testing
+  startRoleGameLoop();
+  setPersistentAnnouncement("DEV DEBUG MODE ACTIVE: Testing as " + getRoleName(role));
 }
 
 function setupSingleplayerRoles() {
@@ -1361,6 +1377,100 @@ function revealRoles() {
   }
 }
 
+// ==================== DEV ROLE TESTER MODAL ====================
+
+function openDevRoleTesterPanel() {
+  let existing = document.getElementById("devTesterContainer");
+  if (existing) existing.remove();
+
+  let container = document.createElement("div");
+  container.id = "devTesterContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 10000; font-family: sans-serif;
+  `;
+
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 25px rgba(0,206,201,0.5); border: 2px solid #00cec9;
+    text-align: left;
+  `;
+
+  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:18px; color:#00cec9;">🧪 DEV ROLE TESTER</h2>
+      <button id="closeDevTester" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+
+    <p style="font-size:13px; color:#b2bec3; margin-bottom:15px;">
+      Select the exact role you want to play as and assign custom roles to the 3 AI bots:
+    </p>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role (Player 1):</label>
+      <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
+        ${roleOptionsHtml}
+      </select>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 2 Role (Player 2):</label>
+      <select id="selBot1Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
+        ${roleOptionsHtml}
+      </select>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 3 Role (Player 3):</label>
+      <select id="selBot2Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
+        ${roleOptionsHtml}
+      </select>
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 4 Role (Player 4):</label>
+      <select id="selBot3Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
+        ${roleOptionsHtml}
+      </select>
+    </div>
+
+    <button id="btnStartDevMatch" style="background:#00b894; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">▶ START DEBUG MATCH</button>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  // Set default selections
+  document.getElementById("selMyRole").value = "1";    // Killer
+  document.getElementById("selBot1Role").value = "3"; // Sheriff
+  document.getElementById("selBot2Role").value = "4"; // Doctor
+  document.getElementById("selBot3Role").value = "8"; // Hunter
+
+  document.getElementById("closeDevTester").onclick = () => container.remove();
+
+  document.getElementById("btnStartDevMatch").onclick = () => {
+    let myR = parseInt(document.getElementById("selMyRole").value);
+    let b1R = parseInt(document.getElementById("selBot1Role").value);
+    let b2R = parseInt(document.getElementById("selBot2Role").value);
+    let b3R = parseInt(document.getElementById("selBot3Role").value);
+
+    container.remove();
+    let staffModal = document.getElementById("staffPanelContainer");
+    if (staffModal) staffModal.remove();
+
+    launchDevDebugMode(myR, b1R, b2R, b3R);
+  };
+}
+
 // ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
 
 function openInGameControlsPanel() {
@@ -1543,6 +1653,9 @@ function openInteractiveStaffPanel() {
           <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
         </label>
       </div>
+      <div style="margin-top:10px;">
+        <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🧪 Launch Dev Role Tester</button>
+      </div>
       ` : `
       <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
         🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
@@ -1622,6 +1735,13 @@ function openInteractiveStaffPanel() {
       isDevModeActive = e.target.checked;
       document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
       setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
+    };
+  }
+
+  let btnDevTester = document.getElementById("btnOpenDevTester");
+  if (btnDevTester) {
+    btnDevTester.onclick = () => {
+      openDevRoleTesterPanel();
     };
   }
 
