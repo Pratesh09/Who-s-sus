@@ -442,7 +442,10 @@ function drawGameplayScreen() {
   let textW = textWidth(nameText);
   text(nameText, width / 2 - 12, 65);
 
-  if (userRank !== "") {
+ if (userRank !== "") {
+    drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
+    drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
+  }
     let shieldColor;
     if (userRank === "Dev") shieldColor = color(52, 152, 219);       
     else if (userRank === "Admin") shieldColor = color(155, 89, 182); 
