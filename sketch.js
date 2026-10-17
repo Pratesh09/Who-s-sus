@@ -18,9 +18,17 @@ let isDevModeActive = false;
 let userRank = "";
 let showShieldIcon = false; 
 
-// Staff Portal State & Logs
-let staffChatMessages = [];
-let submittedReports = [];
+// Staff Portal State & Logs (Persisted in localStorage)
+let staffChatMessages = JSON.parse(localStorage.getItem("game_staffChatMessages")) || [];
+let submittedReports = JSON.parse(localStorage.getItem("game_submittedReports")) || [];
+
+function saveStaffChat() {
+  localStorage.setItem("game_staffChatMessages", JSON.stringify(staffChatMessages));
+}
+
+function saveStaffReports() {
+  localStorage.setItem("game_submittedReports", JSON.stringify(submittedReports));
+}
 
 // Coordinates and radius for interactive shield clicking
 let shieldClickX = 0;
@@ -259,10 +267,8 @@ function drawStartScreen() {
   
   drawButton(width / 2 - 130, height / 2 + 30, 260, 38, "Account Settings", color(52, 73, 94));
   
-  // CREDITS BUTTON
   drawButton(width / 2 - 130, height / 2 + 75, 260, 35, "Credits", color(230, 126, 34));
 
-  // STAFF ASSIST BUTTON
   drawButton(width / 2 - 80, height / 2 + 120, 160, 35, "Staff Assist", color(108, 122, 137));
 }
 
@@ -784,18 +790,30 @@ function setupPeerConnectionHandlers(targetConn) {
       
       if (isHost) {
         broadcastData({ type: "SYNC_PEERS", list: connectedPeersList });
+        broadcastData({ type: "SYNC_STAFF_CHAT", messages: staffChatMessages });
+        broadcastData({ type: "SYNC_STAFF_REPORTS", reports: submittedReports });
       }
     } else if (data.type === "SYNC_PEERS") {
       connectedPeersList = data.list;
+    } else if (data.type === "SYNC_STAFF_CHAT") {
+      staffChatMessages = data.messages;
+      saveStaffChat();
+      updateStaffChatDOM();
+    } else if (data.type === "SYNC_STAFF_REPORTS") {
+      submittedReports = data.reports;
+      saveStaffReports();
+      updateStaffReportsDOM();
     } else if (data.type === "START_GAME") {
       startMultiplayerMatchFromServer(data.roleData);
     } else if (data.type === "ACTION") {
       handleRoleAction(data.targetNum, data.cardIndex);
     } else if (data.type === "STAFF_CHAT") {
       staffChatMessages.push(data.message);
+      saveStaffChat();
       updateStaffChatDOM();
     } else if (data.type === "STAFF_REPORT") {
       submittedReports.push(data.report);
+      saveStaffReports();
       updateStaffReportsDOM();
     }
 
@@ -1901,6 +1919,7 @@ function openInteractiveStaffPanel() {
     if (msg !== "") {
       let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
       staffChatMessages.push(chatObj);
+      saveStaffChat();
       inp.value = "";
       updateStaffChatDOM();
 
@@ -1919,6 +1938,7 @@ function openInteractiveStaffPanel() {
           if (reason !== "") {
             let reportObj = { reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() };
             submittedReports.push(reportObj);
+            saveStaffReports();
             setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
             updateStaffReportsDOM();
 
