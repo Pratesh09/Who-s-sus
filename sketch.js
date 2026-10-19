@@ -1784,12 +1784,39 @@ function openDevRoleTesterPanel() {
 
   document.getElementById("closeDevTester").onclick = () => container.remove();
 
+  // GUARANTEED SHERIFF & KILLER/VAMPIRE RANDOMIZER
   document.getElementById("btnRandomizeRoles").onclick = () => {
     let totalRoles = roleNames.length;
-    document.getElementById("selMyRole").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot1Role").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot2Role").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot3Role").value = floor(random(1, totalRoles + 1));
+    let badRole = (floor(random(1, 3)) === 1) ? 1 : 9; // Killer (1) or Vampire (9)
+    let sheriffRole = 3; // Sheriff
+
+    // Pick 2 other random roles from the remaining role pool
+    let remainingPool = [];
+    for (let i = 1; i <= totalRoles; i++) {
+      if (i !== badRole && i !== sheriffRole) {
+        remainingPool.push(i);
+      }
+    }
+    
+    // Shuffle remaining pool
+    for (let k = remainingPool.length - 1; k > 0; k--) {
+      let j = floor(random(0, k + 1));
+      let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
+    }
+
+    // Build guaranteed deck of 4 roles
+    let deck = [badRole, sheriffRole, remainingPool[0], remainingPool[1]];
+
+    // Shuffle deck positions randomly among Player 1, 2, 3, and 4
+    for (let d = deck.length - 1; d > 0; d--) {
+      let r = floor(random(0, d + 1));
+      let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
+    }
+
+    document.getElementById("selMyRole").value = deck[0];
+    document.getElementById("selBot1Role").value = deck[1];
+    document.getElementById("selBot2Role").value = deck[2];
+    document.getElementById("selBot3Role").value = deck[3];
   };
 
   document.getElementById("btnStartDevMatch").onclick = () => {
@@ -1805,7 +1832,6 @@ function openDevRoleTesterPanel() {
     launchDevDebugMode(myR, b1R, b2R, b3R);
   };
 }
-
 // ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
 
 function openInGameControlsPanel() {
