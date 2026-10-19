@@ -134,14 +134,13 @@ function setup() {
 function updateLocalUserRank() {
   let lowerUser = localUsername.toLowerCase();
   
-  if (authorizedUsers[lowerUser]) {
-    userRank = authorizedUsers[lowerUser];
-    localStorage.setItem("game_userRank", userRank);
-  } else {
-    // Check if a saved rank exists in localStorage
-    userRank = localStorage.getItem("game_userRank") || "";
-  }
-}
+  if (authorizedUsers[lowerUser] && enteredCode === "9315") {
+        userRank = authorizedUsers[lowerUser];
+        saveUsername(enteredUser);
+        localStorage.setItem("game_userRank", userRank); // <--- PERSIST RANK
+        setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
+        if (targetCallback) targetCallback();
+      }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
