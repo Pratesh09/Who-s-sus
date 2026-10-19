@@ -133,10 +133,13 @@ function setup() {
 
 function updateLocalUserRank() {
   let lowerUser = localUsername.toLowerCase();
+  
   if (authorizedUsers[lowerUser]) {
     userRank = authorizedUsers[lowerUser];
+    localStorage.setItem("game_userRank", userRank);
   } else {
-    userRank = userRank || "";
+    // Check if a saved rank exists in localStorage
+    userRank = localStorage.getItem("game_userRank") || "";
   }
 }
 
