@@ -442,10 +442,7 @@ function drawGameplayScreen() {
   let textW = textWidth(nameText);
   text(nameText, width / 2 - 12, 65);
 
- if (userRank !== "") {
-    drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
-    drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
-  }
+  if (userRank !== "") {
     let shieldColor;
     if (userRank === "Dev") shieldColor = color(52, 152, 219);       
     else if (userRank === "Admin") shieldColor = color(155, 89, 182); 
@@ -517,9 +514,11 @@ function drawGameplayScreen() {
     drawButton(width / 2 - 90, height - 90, 180, 45, isSpectating ? "Spectating..." : "Spectate Game", color(142, 68, 173));
   }
 
-  if (userRank !== "") {
+  if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
     drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
     drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
+  } else {
+    drawButton(20, 20, 110, 35, "🚩 Report", color(231, 76, 60));
   }
 }
 
@@ -609,13 +608,41 @@ function getRoleColor(r) {
   }
 }
 
-// ==================== NATIVE PROMPT ====================
+// ==================== NATIVE PROMPT & MODAL HELPERS ====================
 
 function openModal(promptText, callback) {
   let result = prompt(promptText);
   if (result !== null) {
     callback(result);
   }
+}
+
+function triggerNonStaffReportModal() {
+  openModal("Enter the username or Player # to report:", (suspectVal) => {
+    let suspect = suspectVal.trim();
+    if (suspect === "") return;
+
+    openModal("Reason for report (e.g., Cheating, Toxicity):", (reasonVal) => {
+      let reason = reasonVal.trim();
+      if (reason === "") return;
+
+      let reportObj = {
+        reporter: localUsername,
+        suspect: suspect,
+        reason: reason,
+        time: new Date().toLocaleTimeString()
+      };
+
+      submittedReports.push(reportObj);
+      saveStaffReports();
+
+      if (isMultiplayer) {
+        broadcastData({ type: "STAFF_REPORT", report: reportObj });
+      }
+
+      setPersistentAnnouncement("Report submitted! Staff will review it.");
+    });
+  });
 }
 
 function triggerStaffCredentialsPrompt(targetCallback) {
@@ -671,7 +698,7 @@ function openCreditsPanel() {
 
   let panel = document.createElement("div");
   panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
+    background: #2d3436; color: white; width: 90%; max-width: 440px; padding: 20px;
     border-radius: 12px; box-shadow: 0 0 25px rgba(230,126,34,0.5); border: 2px solid #e67e22;
     text-align: center;
   `;
@@ -682,12 +709,26 @@ function openCreditsPanel() {
       <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
     </div>
 
-    <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px;">
+    <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px; max-height:60vh; overflow-y:auto;">
       <p style="margin:0 0 8px 0;"><strong>Head Developer:</strong> Pratesh Gaikwad</p>
       <p style="margin:0 0 8px 0;"><strong>Assistant Developer:</strong> Chinmay</p>
       <p style="margin:0 0 8px 0;"><strong>Drawings & Art:</strong> Heramb</p>
+      <p style="margin:0 0 8px 0;"><strong>Sound Artist:</strong> Heramb Ambole</p>
+      <p style="margin:0 0 8px 0;"><strong>Sounds:</strong> Myinstants</p>
+      
       <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
-      <p style="margin:0 0 6px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
+      
+      <p style="margin:0 0 6px 0; color:#f1c40f; font-weight:bold;">🧪 Testing Team:</p>
+      <ul style="margin:0 0 10px 0; padding-left:20px; color:#dfe6e9; font-size:13px;">
+        <li>Harshit Anchan</li>
+        <li>Rugved Shinde</li>
+        <li>Arnav Gaikwad</li>
+        <li>Mayank Mali</li>
+      </ul>
+
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      
+      <p style="margin:0 0 4px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
       <p style="margin:0 0 10px 0; font-size:13px; color:#b2bec3;"><strong>Hosted on:</strong> GitHub Pages</p>
       <p style="margin:0; font-size:12px; color:#718093; text-align:center;">© 2026 CodeAI Project Team. All rights reserved.</p>
     </div>
@@ -968,14 +1009,20 @@ function mousePressed() {
       }
     }
 
-    if (userRank !== "" && mouseX >= 20 && mouseX <= 160 && mouseY >= 20 && mouseY <= 55) {
-      openInGameControlsPanel();
-      return;
-    }
-
-    if (userRank !== "" && mouseX >= 170 && mouseX <= 290 && mouseY >= 20 && mouseY <= 55) {
-      openInteractiveStaffPanel();
-      return;
+    if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
+      if (mouseX >= 20 && mouseX <= 160 && mouseY >= 20 && mouseY <= 55) {
+        openInGameControlsPanel();
+        return;
+      }
+      if (mouseX >= 170 && mouseX <= 290 && mouseY >= 20 && mouseY <= 55) {
+        openInteractiveStaffPanel();
+        return;
+      }
+    } else {
+      if (mouseX >= 20 && mouseX <= 130 && mouseY >= 20 && mouseY <= 55) {
+        triggerNonStaffReportModal();
+        return;
+      }
     }
 
     if (hunterRevengePending) {
