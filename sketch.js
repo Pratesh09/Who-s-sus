@@ -773,6 +773,11 @@ function openCreditsPanel() {
 function createMultiplayerRoom() {
   currentRoomCode = "ROOM-" + floor(random(1000, 9999));
   
+  if (typeof Peer === "undefined") {
+    statusMessage = "Error: PeerJS library not loaded!";
+    return;
+  }
+
   peer = new Peer(currentRoomCode, {
     host: '0.peerjs.com',
     port: 443,
@@ -807,6 +812,11 @@ function joinMultiplayerRoom(code) {
   isMultiplayer = true;
   isHost = false;
   currentRoomCode = code;
+
+  if (typeof Peer === "undefined") {
+    statusMessage = "Error: PeerJS library not loaded!";
+    return;
+  }
 
   peer = new Peer({
     host: '0.peerjs.com',
@@ -1717,260 +1727,4 @@ function openDevRoleTesterPanel() {
   let panel = document.createElement("div");
   panel.style.cssText = `
     background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 25px rgba(0,206,201,0.5); border: 2px solid #00cec9;
-    text-align: left;
-  `;
-
-  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}.${rName}</option>`).join('');
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:18px; color:#00cec9;">🧪 DEV ROLE TESTER</h2>
-      <button id="closeDevTester" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-
-    <p style="font-size:13px; color:#b2bec3; margin-bottom:12px;">
-      Select the exact role you want to play as and assign custom roles to the 3 AI bots:
-    </p>
-
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role (Player 1):</label>
-      <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
-        ${roleOptionsHtml}
-      </select>
-    </div>
-
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 2 Role (Player 2):</label>
-      <select id="selBot1Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
-        ${roleOptionsHtml}
-      </select>
-    </div>
-
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 3 Role (Player 3):</label>
-      <select id="selBot2Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
-        ${roleOptionsHtml}
-      </select>
-    </div>
-
-    <div style="margin-bottom:14px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 4 Role (Player 4):</label>
-      <select id="selBot3Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
-        ${roleOptionsHtml}
-      </select>
-    </div>
-
-    <div style="display:flex; gap:10px; margin-top:10px;">
-      <button id="btnRandomizeRoles" style="flex:1; background:#e67e22; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🎲 Randomize Roles</button>
-      <button id="btnStartDevMatch" style="flex:1.5; background:#00b894; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">▶ START MATCH</button>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("selMyRole").value = "1";    
-  document.getElementById("selBot1Role").value = "3"; 
-  document.getElementById("selBot2Role").value = "4"; 
-  document.getElementById("selBot3Role").value = "8"; 
-
-  document.getElementById("closeDevTester").onclick = () => container.remove();
-
-  document.getElementById("btnRandomizeRoles").onclick = () => {
-    let totalRoles = roleNames.length;
-    document.getElementById("selMyRole").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot1Role").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot2Role").value = floor(random(1, totalRoles + 1));
-    document.getElementById("selBot3Role").value = floor(random(1, totalRoles + 1));
-  };
-
-  document.getElementById("btnStartDevMatch").onclick = () => {
-    let myR = parseInt(document.getElementById("selMyRole").value);
-    let b1R = parseInt(document.getElementById("selBot1Role").value);
-    let b2R = parseInt(document.getElementById("selBot2Role").value);
-    let b3R = parseInt(document.getElementById("selBot3Role").value);
-
-    container.remove();
-    let staffModal = document.getElementById("staffPanelContainer");
-    if (staffModal) staffModal.remove();
-
-    launchDevDebugMode(myR, b1R, b2R, b3R);
-  };
-}
-
-// ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
-
-function openInGameControlsPanel() {
-  let existing = document.getElementById("inGameControlsContainer");
-  if (existing) existing.remove();
-
-  let container = document.createElement("div");
-  container.id = "inGameControlsContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  container.onclick = (e) => e.stopPropagation();
-  container.onmousedown = (e) => e.stopPropagation();
-  container.ontouchstart = (e) => e.stopPropagation();
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
-    text-align: left;
-  `;
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION CONTROLS</h2>
-      <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <button id="btnIgBlackout" style="background:#d63031; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🚨 Blackout Interrogation</button>
-      <button id="btnIgMute" style="background:#f39c12; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🔇 Mute Player</button>
-      <button id="btnIgBan" style="background:#c0392b; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">⛔ Ban Player</button>
-      <button id="btnIgKick" style="background:#e67e22; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🥾 Kick Player</button>
-    </div>
-    
-    <div style="margin-top:10px;">
-      <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeIgPanel").onclick = () => container.remove();
-
-  document.getElementById("btnIgBlackout").onclick = () => {
-    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
-      let targetID = parseInt(tVal);
-      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
-        blackoutTargetPlayer = targetID;
-        isBlackoutActive = true;
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgMute").onclick = () => {
-    openModal("Enter username of player to MUTE:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverMutedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been MUTED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgBan").onclick = () => {
-    openModal("Enter username of player to BAN:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverBannedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " HAS BEEN BANNED!");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgKick").onclick = () => {
-    openModal("Enter username of player to KICK:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverKickedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been KICKED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgEmp").onclick = () => {
-    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
-      let dID = parseInt(dVal);
-      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
-        disabledRolePlayers.push(dID);
-        setPersistentAnnouncement("In-Game Action: EMP jammed ability for Player " + (dID === 0 ? "You" : (dID + 1)));
-        container.remove();
-      }
-    });
-  };
-}
-
-// ==================== PANEL 2: STAFF PORTAL MODAL ====================
-
-function openInteractiveStaffPanel() {
-  let existingModal = document.getElementById("staffPanelContainer");
-  if (existingModal) existingModal.remove();
-
-  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
-  let isDev = (userRank === "Dev");
-
-  let container = document.createElement("div");
-  container.id = "staffPanelContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  container.onclick = (e) => e.stopPropagation();
-  container.onmousedown = (e) => e.stopPropagation();
-  container.ontouchstart = (e) => e.stopPropagation();
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
-    max-height: 80vh; overflow-y: auto; text-align: left;
-  `;
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
-      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-
-    <!-- TAB BUTTONS -->
-    <div style="display:flex; gap:10px; margin-bottom:15px;">
-      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Portal Controls</button>
-      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
-      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
-    </div>
-
-    <!-- CONTROLS SECTION -->
-    <div id="sectionControls">
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Global Server Controls</h3>
-      
-      ${isDevOrAdmin ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Shut Down Active Servers:</strong></span>
-        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN ALL</button>
-      </div>
-      ` : ''}
-
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Global EMP Jammer Switch:</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-
+    border-radius: 12px; box-shadow: 0 0 25px rgba(0,206,201,0.5); border: 2px solid #00cec
