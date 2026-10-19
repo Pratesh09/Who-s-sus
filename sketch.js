@@ -109,7 +109,15 @@ let autoStartTimeout = null;
 function saveUsername(newName) {
   localUsername = newName;
   localStorage.setItem("game_localUsername", newName);
-  updateLocalUserRank();
+  
+  let lowerUser = newName.toLowerCase();
+  if (authorizedUsers[lowerUser]) {
+    userRank = authorizedUsers[lowerUser];
+    localStorage.setItem("game_userRank", userRank);
+  } else {
+    userRank = "";
+    localStorage.removeItem("game_userRank");
+  }
 }
 
 function getRoleName(roleNum) {
