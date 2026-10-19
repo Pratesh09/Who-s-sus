@@ -7,6 +7,7 @@ let totalPlayersCount = 4;
 
 // LOAD PERSISTED USERNAME OR DEFAULT TO "Player"
 let localUsername = localStorage.getItem("game_localUsername") || "Player";
+let userRank = localStorage.getItem("game_userRank") || "";
 
 // PeerJS Networking Variables
 let peer = null;
@@ -15,7 +16,6 @@ let connectedPeersList = [];
 let activePeerConnections = [];
 
 let isDevModeActive = false;
-let userRank = "";
 let showShieldIcon = false; 
 
 // Staff Portal State & Logs (Persisted in localStorage)
@@ -41,10 +41,10 @@ const authorizedUsers = {
   "admin": "Admin",
   "mod": "Moderator",
   "user": "Admin",
-  "tankamdemkin": "Admin"
-  "harshit": "Dev"
-  "rugved": "Dev"
-  "mayank": "Admin"
+  "tankamdemkin": "Admin",
+  "harshit": "Dev",
+  "rugved": "Dev",
+  "mayank": "Admin",
   "arnav": "Dev"
 };
 
@@ -109,14 +109,16 @@ let autoStartTimeout = null;
 function saveUsername(newName) {
   localUsername = newName;
   localStorage.setItem("game_localUsername", newName);
-  
-  let lowerUser = newName.toLowerCase();
+  updateLocalUserRank();
+}
+
+function updateLocalUserRank() {
+  let lowerUser = localUsername.toLowerCase();
   if (authorizedUsers[lowerUser]) {
     userRank = authorizedUsers[lowerUser];
     localStorage.setItem("game_userRank", userRank);
   } else {
-    userRank = "";
-    localStorage.removeItem("game_userRank");
+    userRank = localStorage.getItem("game_userRank") || "";
   }
 }
 
@@ -138,17 +140,6 @@ function setup() {
   setupTargetCardBounds();
   updateLocalUserRank();
 }
-
-function updateLocalUserRank() {
-  let lowerUser = localUsername.toLowerCase();
-  
-  if (authorizedUsers[lowerUser] && enteredCode === "9315") {
-        userRank = authorizedUsers[lowerUser];
-        saveUsername(enteredUser);
-        localStorage.setItem("game_userRank", userRank); // <--- PERSIST RANK
-        setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
-        if (targetCallback) targetCallback();
-      }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
@@ -681,8 +672,9 @@ function triggerStaffCredentialsPrompt(targetCallback) {
 
       let lowerUser = enteredUser.toLowerCase();
       if (authorizedUsers[lowerUser] && enteredCode === "9315") {
-        saveUsername(enteredUser);
         userRank = authorizedUsers[lowerUser];
+        saveUsername(enteredUser);
+        localStorage.setItem("game_userRank", userRank);
         setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
         if (targetCallback) targetCallback();
       } else {
