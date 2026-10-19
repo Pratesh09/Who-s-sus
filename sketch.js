@@ -62,7 +62,7 @@ let announcementHoldTimer = 0;
 const roleNames = [
   "Killer", "Guardian Angel", "Sheriff", "Doctor", 
   "Detective", "Jester", "Innocent", "Hunter", 
-  "Vampire", "Swapper", "Hacker", "Altruist", "Witch"
+  "Vampire", "Swapper", "Hacker", "Altruist", "Witch", "Warden"
 ];
 
 let role = 0;         
@@ -86,6 +86,12 @@ let lastEliminatedRole = null;
 
 let altruistSelectedTarget = null; 
 let suspiciousTarget = 1; 
+
+// Warden Mechanics Variables
+let custodyTargetID = null;
+let executionTimer = null;
+let executionCountdown = 0;
+let isWardenStripped = false;
 
 let hasAnyPlayerDied = false;
 let revealedKillerID = null; 
@@ -506,11 +512,22 @@ function drawGameplayScreen() {
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
     
+    if (custodyTargetID === (i + 1)) {
+      fill(230, 126, 34);
+      textSize(12);
+      textStyle(BOLD);
+      text("🔒 IN CUSTODY (" + executionCountdown + "s)", card.x + card.w / 2, card.y + 110);
+    }
+
     if (isDevModeActive) {
       fill(241, 196, 15);
       textSize(12);
       text("[" + getRoleName(targetRoles[i]) + "]", card.x + card.w / 2, card.y + 125);
     }
+  }
+
+  if (role === 14 && custodyTargetID !== null) {
+    drawButton(width / 2 - 100, height - 130, 200, 38, "Pardon Player", color(46, 204, 113));
   }
 
   if (hunterRevengePending) {
@@ -609,6 +626,7 @@ function getRoleColor(r) {
     case 11: return color(0, 255, 255);
     case 12: return color(241, 196, 15);
     case 13: return color(128, 0, 128);
+    case 14: return color(211, 84, 0);
     default: return color(255);
   }
 }
@@ -884,7 +902,7 @@ function setupPeerConnectionHandlers(targetConn) {
 function updateStaffChatDOM() {
   let box = document.getElementById("chatHistoryBox");
   if (box) {
-    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
+    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('');
     box.scrollTop = box.scrollHeight;
   }
   let tabChatBtn = document.getElementById("tabChat");
@@ -898,7 +916,7 @@ function updateStaffReportsDOM() {
   if (repBox) {
     let listDiv = repBox.querySelector("div:last-child");
     if (listDiv) {
-      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
+      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
     }
   }
   let tabRepBtn = document.getElementById("tabReports");
@@ -1031,6 +1049,14 @@ function mousePressed() {
       }
     }
 
+    if (role === 14 && custodyTargetID !== null) {
+      if (mouseX >= width / 2 - 100 && mouseX <= width / 2 + 100 &&
+          mouseY >= height - 130 && mouseY <= height - 92) {
+        pardonCustodyTarget();
+        return;
+      }
+    }
+
     if (hunterRevengePending) {
       if (mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 &&
           mouseY >= height - 90 && mouseY <= height - 45) {
@@ -1059,6 +1085,7 @@ function mousePressed() {
     if (mouseX >= width / 2 - 100 && mouseX <= width / 2 + 100 &&
         mouseY >= height - 100 && mouseY <= height - 55) {
       if (gameLoopInterval) clearInterval(gameLoopInterval);
+      if (executionTimer) clearInterval(executionTimer);
       if (peer) peer.destroy();
       currentScreen = "screen0";
     }
@@ -1113,6 +1140,12 @@ function resetSingleplayerState() {
   disabledRolePlayers = [];
   altruistSelectedTarget = null;
   announcementHoldTimer = 0;
+  
+  custodyTargetID = null;
+  if (executionTimer) clearInterval(executionTimer);
+  executionTimer = null;
+  executionCountdown = 0;
+  isWardenStripped = false;
 }
 
 function startSingleplayer() {
@@ -1140,10 +1173,10 @@ function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
 
 function setupSingleplayerRoles() {
   let primaryBadRole = (floor(random(1, 3)) === 1) ? 1 : 9;
-  let townRoles = [2, 4, 5, 8];
+  let townRoles = [2, 4, 5, 8, 14];
   let guaranteedTown = townRoles[floor(random(0, townRoles.length))];
   
-  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13];
+  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
   for (let i = 0; i < remainingPool.length; i++) {
     if (remainingPool[i] === guaranteedTown) {
       remainingPool.splice(i, 1);
@@ -1187,6 +1220,63 @@ function setupRoleUI() {
   else if (role === 11) statusMessage = "Hacker: Click any player to trigger EMP!";
   else if (role === 12) statusMessage = "Altruist: Choose a player to mark for role announcement.";
   else if (role === 13) statusMessage = "Witch: Click a player to guess their role!";
+  else if (role === 14) statusMessage = "Warden: Select a suspect to detain for execution!";
+}
+
+// ==================== WARDEN HELPER FUNCTIONS ====================
+
+function startWardenExecution(targetNum, cardIndex) {
+  if (isWardenStripped) {
+    setPersistentAnnouncement("WARDEN PENALTY: You executed a citizen and lost your power!");
+    return;
+  }
+
+  custodyTargetID = targetNum;
+  executionCountdown = 10;
+  targetCards[cardIndex].borderColor = color(230, 126, 34);
+
+  setPersistentAnnouncement("WARDEN: Player " + (targetNum + 1) + " detained! 10s execution timer started!");
+
+  if (executionTimer) clearInterval(executionTimer);
+
+  executionTimer = setInterval(() => {
+    executionCountdown--;
+
+    if (executionCountdown <= 0) {
+      clearInterval(executionTimer);
+      executionTimer = null;
+      executeCustodyTarget();
+    }
+  }, 1000);
+}
+
+function pardonCustodyTarget() {
+  if (executionTimer) clearInterval(executionTimer);
+  executionTimer = null;
+
+  if (custodyTargetID !== null && custodyTargetID > 0) {
+    targetCards[custodyTargetID - 1].borderColor = color(180);
+  }
+
+  setPersistentAnnouncement("PARDONED: Warden released Player " + (custodyTargetID + 1) + " from custody!");
+  custodyTargetID = null;
+}
+
+function executeCustodyTarget() {
+  let targetRole = targetRoles[custodyTargetID - 1];
+
+  setPersistentAnnouncement("EXECUTED: Player " + (custodyTargetID + 1) + " (" + getRoleName(targetRole) + ") was executed by the Warden!");
+
+  if (targetRole !== 1 && targetRole !== 9) {
+    isWardenStripped = true;
+  }
+
+  isTargetAlive[custodyTargetID - 1] = false;
+  targetCards[custodyTargetID - 1].borderColor = color(231, 76, 60);
+  notifyPlayerDeath(targetRole, custodyTargetID);
+  
+  custodyTargetID = null;
+  checkGameStatus();
 }
 
 // ==================== HELPER & GAMEPLAY FUNCTIONS ====================
@@ -1311,6 +1401,9 @@ function handleRoleAction(targetNum, cardIndex) {
     triggerAbilityCooldown();
   } else if (role === 13) { // WITCH
     executeWitchGuess(targetNum, cardIndex, 0);
+    triggerAbilityCooldown();
+  } else if (role === 14) { // WARDEN
+    startWardenExecution(targetNum, cardIndex);
     triggerAbilityCooldown();
   }
 }
@@ -1457,13 +1550,13 @@ function performRoleSwap(targetNum) {
 function executeWitchGuess(targetNum, cardIndex, witchActorID) {
   let actualRole = (targetNum === 0) ? role : targetRoles[targetNum - 1];
   
-  openModal("WITCH GUESS: Enter Role ID (1-13) for Player:\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch", (val) => {
+  openModal("WITCH GUESS: Enter Role ID (1-14) for Player:\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch 14.Warden", (val) => {
     let guessedRole = parseInt(val);
-    if (isNaN(guessedRole) || guessedRole < 1 || guessedRole > 13) return;
+    if (isNaN(guessedRole) || guessedRole < 1 || guessedRole > 14) return;
 
     if (guessedRole === actualRole) {
       setPersistentAnnouncement("WITCH SPELL SUCCESS!");
-      if ([1, 9, 3, 6].includes(actualRole)) {
+      if ([1, 9, 3, 6, 14].includes(actualRole)) {
         winReason = "Witch Wins: Correctly guessed and eliminated a Key Role!";
         currentScreen = "screen8"; 
         revealRoles();
@@ -1628,7 +1721,7 @@ function openDevRoleTesterPanel() {
     text-align: left;
   `;
 
-  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
+  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}.${rName}</option>`).join('');
 
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
@@ -1636,39 +1729,42 @@ function openDevRoleTesterPanel() {
       <button id="closeDevTester" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
     </div>
 
-    <p style="font-size:13px; color:#b2bec3; margin-bottom:15px;">
+    <p style="font-size:13px; color:#b2bec3; margin-bottom:12px;">
       Select the exact role you want to play as and assign custom roles to the 3 AI bots:
     </p>
 
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:10px;">
       <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role (Player 1):</label>
       <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
       </select>
     </div>
 
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:10px;">
       <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 2 Role (Player 2):</label>
       <select id="selBot1Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
       </select>
     </div>
 
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:10px;">
       <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 3 Role (Player 3):</label>
       <select id="selBot2Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
       </select>
     </div>
 
-    <div style="margin-bottom:18px;">
+    <div style="margin-bottom:14px;">
       <label style="display:block; font-size:13px; margin-bottom:4px; color:#f1c40f;">Bot 4 Role (Player 4):</label>
       <select id="selBot3Role" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
       </select>
     </div>
 
-    <button id="btnStartDevMatch" style="background:#00b894; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">▶ START DEBUG MATCH</button>
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <button id="btnRandomizeRoles" style="flex:1; background:#e67e22; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🎲 Randomize Roles</button>
+      <button id="btnStartDevMatch" style="flex:1.5; background:#00b894; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">▶ START MATCH</button>
+    </div>
   `;
 
   panel.innerHTML = html;
@@ -1681,6 +1777,14 @@ function openDevRoleTesterPanel() {
   document.getElementById("selBot3Role").value = "8"; 
 
   document.getElementById("closeDevTester").onclick = () => container.remove();
+
+  document.getElementById("btnRandomizeRoles").onclick = () => {
+    let totalRoles = roleNames.length;
+    document.getElementById("selMyRole").value = floor(random(1, totalRoles + 1));
+    document.getElementById("selBot1Role").value = floor(random(1, totalRoles + 1));
+    document.getElementById("selBot2Role").value = floor(random(1, totalRoles + 1));
+    document.getElementById("selBot3Role").value = floor(random(1, totalRoles + 1));
+  };
 
   document.getElementById("btnStartDevMatch").onclick = () => {
     let myR = parseInt(document.getElementById("selMyRole").value);
@@ -1869,143 +1973,4 @@ function openInteractiveStaffPanel() {
         </label>
       </div>
 
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Features</h3>
-      ${isDev ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Dev Sandbox (View Bot Roles):</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-      <div style="margin-top:10px;">
-        <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🧪 Launch Dev Role Tester</button>
-      </div>
-      ` : `
-      <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
-        🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
-      </div>
-      `}
-    </div>
-
-    <!-- CHAT SECTION -->
-    <div id="sectionChat" style="display:none;">
-      <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
-        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('')}
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
-        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">Send</button>
-      </div>
-    </div>
-
-    <!-- REPORTS SECTION -->
-    <div id="sectionReports" style="display:none;">
-      <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
-      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
-        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
-      </div>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeStaffPanel").onclick = () => container.remove();
-
-  let sControls = document.getElementById("sectionControls");
-  let sChat = document.getElementById("sectionChat");
-  let sReports = document.getElementById("sectionReports");
-  let tControls = document.getElementById("tabControls");
-  let tChat = document.getElementById("tabChat");
-  let tReports = document.getElementById("tabReports");
-
-  tControls.onclick = () => {
-    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none";
-    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72";
-  };
-  tChat.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none";
-    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72";
-  };
-  tReports.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block";
-    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
-  };
-
-  if (isDevOrAdmin) {
-    document.getElementById("btnShutdownServer").onclick = () => {
-      if (gameLoopInterval) clearInterval(gameLoopInterval);
-      if (peer) peer.destroy();
-      currentScreen = "screen0";
-      setPersistentAnnouncement("STAFF ACTION: All active room servers shut down!");
-      container.remove();
-    };
-  }
-
-  let toggleEmp = document.getElementById("toggleEmpSwitch");
-  if (toggleEmp) {
-    toggleEmp.onchange = (e) => {
-      manualEmpLock = e.target.checked;
-      document.getElementById("sliderEmp").style.backgroundColor = manualEmpLock ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
-    };
-  }
-
-  let toggleBot = document.getElementById("toggleBotDisplaySwitch");
-  if (toggleBot) {
-    toggleBot.onchange = (e) => {
-      isDevModeActive = e.target.checked;
-      document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
-    };
-  }
-
-  let btnDevTester = document.getElementById("btnOpenDevTester");
-  if (btnDevTester) {
-    btnDevTester.onclick = () => {
-      openDevRoleTesterPanel();
-    };
-  }
-
-  document.getElementById("btnSendChatMsg").onclick = () => {
-    let inp = document.getElementById("chatInputText");
-    let msg = inp.value.trim();
-    if (msg !== "") {
-      let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
-      staffChatMessages.push(chatObj);
-      saveStaffChat();
-      inp.value = "";
-      updateStaffChatDOM();
-
-      if (isMultiplayer) {
-        broadcastData({ type: "STAFF_CHAT", message: chatObj });
-      }
-    }
-  };
-
-  document.getElementById("btnReportNewPlayer").onclick = () => {
-    openModal("Enter the username of the player you want to report:", (targetUser) => {
-      let suspect = targetUser.trim();
-      if (suspect !== "") {
-        openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
-          let reason = reasonVal.trim();
-          if (reason !== "") {
-            let reportObj = { reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() };
-            submittedReports.push(reportObj);
-            saveStaffReports();
-            setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
-            updateStaffReportsDOM();
-
-            if (isMultiplayer) {
-              broadcastData({ type: "STAFF_REPORT", report: reportObj });
-            }
-
-            container.remove();
-          }
-        });
-      }
-    });
-  };
-}
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-
