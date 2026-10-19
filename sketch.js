@@ -42,10 +42,6 @@ const authorizedUsers = {
   "mod": "Moderator",
   "user": "Admin",
   "tankamdemkin": "Admin",
-  "harshit": "Dev",
-  "rugved": "Dev",
-  "mayank": "Admin",
-  "arnav": "Dev"
 };
 
 let serverBannedUsers = [];
