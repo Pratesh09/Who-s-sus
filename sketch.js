@@ -259,7 +259,7 @@ function drawStartScreen() {
   fill(255);
   textSize(36);
   textStyle(BOLD);
-  text("13-Role Social Deduction", width / 2, height / 2 - 200);
+  text("Who is Sus", width / 2, height / 2 - 200);
 
   textSize(16);
   textStyle(NORMAL);
