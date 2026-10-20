@@ -1988,4 +1988,191 @@ function openInteractiveStaffPanel() {
     z-index: 9999; font-family: sans-serif;
   `;
 
-  container
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
+    max-height: 80vh; overflow-y: auto; text-align: left;
+  `;
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
+      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+    
+    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
+    </div>
+
+    <!-- TAB BUTTONS -->
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Portal Controls</button>
+      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
+      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
+    </div>
+
+    <!-- CONTROLS SECTION -->
+    <div id="sectionControls">
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Global Server Controls</h3>
+      
+      ${isDevOrAdmin ? `
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Shut Down Active Servers:</strong></span>
+        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN ALL</button>
+      </div>
+      ` : ''}
+
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Global EMP Jammer Switch:</strong></span>
+        <label style="position:relative; display:inline-block; width:44px; height:24px;">
+          <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
+          <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
+        </label>
+      </div>
+
+      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Features</h3>
+      ${isDev ? `
+      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
+        <span><strong>Dev Sandbox (View Bot Roles):</strong></span>
+        <label style="position:relative; display:inline-block; width:44px; height:24px;">
+          <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
+          <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🧪 Launch Dev Role Tester</button>
+      </div>
+      ` : `
+      <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
+        🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
+      </div>
+      `}
+    </div>
+
+    <!-- CHAT SECTION -->
+    <div id="sectionChat" style="display:none;">
+      <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
+        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('')}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
+        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">Send</button>
+      </div>
+    </div>
+
+    <!-- REPORTS SECTION -->
+    <div id="sectionReports" style="display:none;">
+      <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
+      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
+        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
+      </div>
+    </div>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeStaffPanel").onclick = () => container.remove();
+
+  let sControls = document.getElementById("sectionControls");
+  let sChat = document.getElementById("sectionChat");
+  let sReports = document.getElementById("sectionReports");
+  let tControls = document.getElementById("tabControls");
+  let tChat = document.getElementById("tabChat");
+  let tReports = document.getElementById("tabReports");
+
+  tControls.onclick = () => {
+    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none";
+    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72";
+  };
+  tChat.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none";
+    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72";
+  };
+  tReports.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block";
+    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
+  };
+
+  if (isDevOrAdmin) {
+    document.getElementById("btnShutdownServer").onclick = () => {
+      if (gameLoopInterval) clearInterval(gameLoopInterval);
+      if (executionTimer) clearInterval(executionTimer);
+      if (peer) peer.destroy();
+      currentScreen = "screen0";
+      setPersistentAnnouncement("STAFF ACTION: All active room servers shut down!");
+      container.remove();
+    };
+  }
+
+  let toggleEmp = document.getElementById("toggleEmpSwitch");
+  if (toggleEmp) {
+    toggleEmp.onchange = (e) => {
+      manualEmpLock = e.target.checked;
+      document.getElementById("sliderEmp").style.backgroundColor = manualEmpLock ? '#00cec9' : '#636e72';
+      setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+    };
+  }
+
+  let toggleBot = document.getElementById("toggleBotDisplaySwitch");
+  if (toggleBot) {
+    toggleBot.onchange = (e) => {
+      isDevModeActive = e.target.checked;
+      document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
+      setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
+    };
+  }
+
+  let btnDevTester = document.getElementById("btnOpenDevTester");
+  if (btnDevTester) {
+    btnDevTester.onclick = () => {
+      openDevRoleTesterPanel();
+    };
+  }
+
+  document.getElementById("btnSendChatMsg").onclick = () => {
+    let inp = document.getElementById("chatInputText");
+    let msg = inp.value.trim();
+    if (msg !== "") {
+      let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
+      staffChatMessages.push(chatObj);
+      saveStaffChat();
+      inp.value = "";
+      updateStaffChatDOM();
+
+      if (isMultiplayer) {
+        broadcastData({ type: "STAFF_CHAT", message: chatObj });
+      }
+    }
+  };
+
+  document.getElementById("btnReportNewPlayer").onclick = () => {
+    openModal("Enter the username of the player you want to report:", (targetUser) => {
+      let suspect = targetUser.trim();
+      if (suspect !== "") {
+        openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
+          let reason = reasonVal.trim();
+          if (reason !== "") {
+            let reportObj = { reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() };
+            submittedReports.push(reportObj);
+            saveStaffReports();
+            setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
+            updateStaffReportsDOM();
+
+            if (isMultiplayer) {
+              broadcastData({ type: "STAFF_REPORT", report: reportObj });
+            }
+
+            container.remove();
+          }
+        });
+      }
+    });
+  };
+}
