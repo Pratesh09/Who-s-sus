@@ -43,7 +43,7 @@ const authorizedUsers = {
   "mod": "Moderator",
   "user": "Admin",
   "tankamdemkin": "Admin",
-  "harshit": "Dev",
+  "idharmerabahutaurahai": "Dev",
   "rugved": "Dev",
   "mayank": "Admin",
   "arnav": "Dev"
