@@ -1766,26 +1766,35 @@ function notifyPlayerDeath(eliminatedRole, eliminatedID) {
 function triggerAbilityCooldown() {
   abilityCooldown = true;
   cooldownTimer = 30;
+  
   let timerInterval = setInterval(() => {
+    // FREEZE COOLDOWN IF EMP IS ACTIVE
+    if (empActive || manualEmpLock) {
+      if (currentScreen === "screen2" && isPlayerAlive) {
+        statusMessage = "⚡ COOLDOWN FROZEN (EMP JAMMED: " + cooldownTimer + "s)";
+      }
+      return; // Skip decrementing the timer while frozen!
+    }
+
     cooldownTimer--;
 
     if (announcementHoldTimer > 0) {
       announcementHoldTimer--;
     }
 
-    if (currentScreen === "screen2" && isPlayerAlive && !empActive && !manualEmpLock) {
+    if (currentScreen === "screen2" && isPlayerAlive) {
       statusMessage = "Cooldown: " + cooldownTimer + "s";
     }
+
     if (cooldownTimer <= 0) {
       clearInterval(timerInterval);
       abilityCooldown = false;
-      if (currentScreen === "screen2" && isPlayerAlive && !empActive && !manualEmpLock) {
+      if (currentScreen === "screen2" && isPlayerAlive) {
         setupRoleUI();
       }
     }
   }, 1000);
 }
-
 function handlePlayerDeath() {
   isPlayerAlive = false;
   notifyPlayerDeath(role, 0);
