@@ -43,7 +43,7 @@ const authorizedUsers = {
   "mod": "Moderator",
   "user": "Admin",
   "tankamdemkin": "Admin",
-  "thekingprototye123": "Dev",
+  "harshit": "Dev",
   "rugved": "Dev",
   "mayank": "Admin",
   "arnav": "Dev"
@@ -188,6 +188,154 @@ function draw() {
 }
 
 // ==================== CUSTOM VECTOR BADGES ====================
+
+function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
+  push();
+  translate(x, y);
+
+  let cHex = getRoleColorHex(roleId);
+  
+  // Outer Diamond Frame
+  stroke(255, 255, 255, 220);
+  strokeWeight(3);
+  fill(color(cHex));
+  beginShape();
+  vertex(0, -sz);
+  vertex(sz * 0.8, 0);
+  vertex(0, sz);
+  vertex(-sz * 0.8, 0);
+  endShape(CLOSE);
+
+  // Inner Diamond Border
+  stroke(255, 255, 255, 120);
+  strokeWeight(1.5);
+  noFill();
+  beginShape();
+  vertex(0, -sz * 0.82);
+  vertex(sz * 0.65, 0);
+  vertex(0, sz * 0.82);
+  vertex(-sz * 0.65, 0);
+  endShape(CLOSE);
+
+  // Role Icon Vectors
+  noStroke();
+  fill(255);
+
+  if (roleId === 1) { // Killer (Dagger)
+    push();
+    rotate(QUARTER_PI);
+    rect(-sz * 0.08, -sz * 0.4, sz * 0.16, sz * 0.5, 2);
+    triangle(0, -sz * 0.55, -sz * 0.12, -sz * 0.35, sz * 0.12, -sz * 0.35);
+    rect(-sz * 0.2, 0.1 * sz, sz * 0.4, sz * 0.08, 2);
+    rect(-sz * 0.08, 0.18 * sz, sz * 0.16, sz * 0.2, 2);
+    pop();
+  } 
+  else if (roleId === 2) { // GA (Shield & Wings)
+    fill(255, 215, 0);
+    arc(-sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, HALF_PI, PI + HALF_PI);
+    arc(sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, PI + HALF_PI, HALF_PI);
+    fill(255);
+    beginShape();
+    vertex(0, -sz * 0.35);
+    vertex(sz * 0.25, -sz * 0.2);
+    vertex(sz * 0.2, sz * 0.2);
+    vertex(0, sz * 0.38);
+    vertex(-sz * 0.2, sz * 0.2);
+    vertex(-sz * 0.25, -sz * 0.2);
+    endShape(CLOSE);
+  }
+  else if (roleId === 3) { // Sheriff (6-Point Star)
+    fill(255, 223, 0);
+    push();
+    drawStarVector(0, 0, sz * 0.2, sz * 0.45, 6);
+    pop();
+  }
+  else if (roleId === 4) { // Doctor (Cross & Syringe)
+    fill(255);
+    rect(-sz * 0.1, -sz * 0.35, sz * 0.2, sz * 0.7, 3);
+    rect(-sz * 0.35, -sz * 0.1, sz * 0.7, sz * 0.2, 3);
+    stroke(46, 204, 113);
+    strokeWeight(2);
+    line(-sz * 0.2, sz * 0.2, sz * 0.2, -sz * 0.2);
+  }
+  else if (roleId === 5) { // Detective (Handcuffs)
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+    ellipse(-sz * 0.18, -sz * 0.05, sz * 0.3, sz * 0.3);
+    ellipse(sz * 0.18, sz * 0.1, sz * 0.3, sz * 0.3);
+    line(-sz * 0.05, -sz * 0.05, sz * 0.05, sz * 0.1);
+  }
+  else if (roleId === 6) { // Jester (Crown)
+    fill(255);
+    beginShape();
+    vertex(-sz * 0.35, -sz * 0.1);
+    vertex(-sz * 0.25, sz * 0.2);
+    vertex(sz * 0.25, sz * 0.2);
+    vertex(sz * 0.35, -sz * 0.1);
+    vertex(sz * 0.15, 0);
+    vertex(0, -sz * 0.35);
+    vertex(-sz * 0.15, 0);
+    endShape(CLOSE);
+  }
+  else if (roleId === 11) { // Hacker (Laptop)
+    fill(255);
+    rect(-sz * 0.3, -sz * 0.25, sz * 0.6, sz * 0.38, 4);
+    fill(30);
+    rect(-sz * 0.25, -sz * 0.21, sz * 0.5, sz * 0.3);
+    fill(255);
+    rect(-sz * 0.38, sz * 0.15, sz * 0.76, sz * 0.1, 3);
+  }
+  else if (roleId === 12) { // Altruist (Nezha / Spear & Ribbon Ring)
+    stroke(231, 76, 60);
+    strokeWeight(3);
+    noFill();
+    ellipse(0, 0, sz * 0.6, sz * 0.6);
+    noStroke();
+    fill(241, 196, 15);
+    triangle(0, -sz * 0.45, -sz * 0.1, -sz * 0.1, sz * 0.1, -sz * 0.1);
+    rect(-sz * 0.03, -sz * 0.1, sz * 0.06, sz * 0.5);
+  }
+  else if (roleId === 10) { // Swapper (Arrow Loops)
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+    arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
+    arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
+  }
+  else { // Default
+    fill(255);
+    ellipse(0, 0, sz * 0.4, sz * 0.4);
+  }
+
+  if (labelText) {
+    noStroke();
+    fill(0, 0, 0, 190);
+    rect(-sz * 0.65, sz * 0.5, sz * 1.3, sz * 0.32, 4);
+    fill(255);
+    textSize(max(9, sz * 0.22));
+    textStyle(BOLD);
+    textAlign(CENTER, CENTER);
+    text(labelText, 0, sz * 0.65);
+  }
+
+  pop();
+}
+
+function drawStarVector(x, y, radius1, radius2, npoints) {
+  let angle = TWO_PI / npoints;
+  let halfAngle = angle / 2.0;
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += angle) {
+    let sx = x + cos(a) * radius2;
+    let sy = y + sin(a) * radius2;
+    vertex(sx, sy);
+    sx = x + cos(a + halfAngle) * radius1;
+    sy = y + sin(a + halfAngle) * radius1;
+    vertex(sx, sy);
+  }
+  endShape(CLOSE);
+}
 
 function drawBlackoutBadge(x, y, scaleFactor) {
   push();
@@ -420,6 +568,8 @@ function drawRoleRevealScreen() {
         textSize(16);
         textStyle(BOLD);
         text(getRoleName(role), card.x + card.w / 2, card.y + card.h / 2 - 12);
+        
+        drawVectorRoleBadge(card.x + card.w / 2, card.y + card.h / 2 + 25, 22, role);
       } else {
         stroke(100);
         strokeWeight(2);
@@ -525,9 +675,7 @@ function drawGameplayScreen() {
     }
 
     if (isDevModeActive) {
-      fill(241, 196, 15);
-      textSize(12);
-      text("[" + getRoleName(targetRoles[i]) + "]", card.x + card.w / 2, card.y + 125);
+      drawVectorRoleBadge(card.x + card.w / 2, card.y + 130, 18, targetRoles[i], getRoleName(targetRoles[i]));
     }
   }
 
@@ -635,6 +783,26 @@ function getRoleColor(r) {
     case 13: return color(128, 0, 128);
     case 14: return color(211, 84, 0);
     default: return color(255);
+  }
+}
+
+function getRoleColorHex(r) {
+  switch (r) {
+    case 1: return "#e74c3c";
+    case 2: return "#06eff8";
+    case 3: return "#3498db";
+    case 4: return "#2ecc71";
+    case 5: return "#9b59b6";
+    case 6: return "#e67e22";
+    case 7: return "#95a5a6";
+    case 8: return "#8b0000";
+    case 9: return "#dc143c";
+    case 10: return "#ff00ff";
+    case 11: return "#00ffff";
+    case 12: return "#f1c40f";
+    case 13: return "#800080";
+    case 14: return "#d35400";
+    default: return "#ffffff";
   }
 }
 
@@ -945,7 +1113,7 @@ function updateStaffReportsDOM() {
 // ==================== INTERACTION & EVENTS ====================
 
 function mousePressed() {
-  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer")) {
+  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer") || document.getElementById("witchGuessContainer")) {
     return;
   }
 
@@ -1316,6 +1484,118 @@ function executeCustodyTarget() {
   checkGameStatus();
 }
 
+// ==================== SUPER SUS WITCH MODAL ====================
+
+function openSuperSusWitchModal(targetNum, cardIndex, witchActorID) {
+  let existing = document.getElementById("witchGuessContainer");
+  if (existing) existing.remove();
+
+  let targetName = (targetNum === 0) ? localUsername : ("Player " + (targetNum + 1));
+  let actualRole = (targetNum === 0) ? role : targetRoles[targetNum - 1];
+
+  let container = document.createElement("div");
+  container.id = "witchGuessContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.88); display: flex; justify-content: center; align-items: center;
+    z-index: 10000; font-family: sans-serif;
+  `;
+
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #1e272e; color: white; width: 92%; max-width: 500px; padding: 20px;
+    border-radius: 16px; box-shadow: 0 0 30px rgba(155, 89, 182, 0.6); border: 2px solid #8e44ad;
+    text-align: center;
+  `;
+
+  let rolesGridHtml = "";
+  for (let i = 0; i < roleNames.length; i++) {
+    let rId = i + 1;
+    let rName = roleNames[i];
+    let hexColor = getRoleColorHex(rId);
+
+    rolesGridHtml += `
+      <button class="witch-role-btn" data-roleid="${rId}" style="
+        background: #2d3436; color: white; border: 2px solid ${hexColor};
+        padding: 12px 8px; border-radius: 10px; cursor: pointer; font-weight: bold;
+        font-size: 13px; display: flex; align-items: center; justify-content: space-between;
+        transition: transform 0.15s ease, background 0.15s ease;
+      " onmouseover="this.style.transform='scale(1.03)'; this.style.background='#353b48';" onmouseout="this.style.transform='scale(1)'; this.style.background='#2d3436';">
+        <span style="color: ${hexColor}; font-weight: bold; font-size: 14px;">#${rId}</span>
+        <span style="flex:1; text-align:center;">${rName}</span>
+        <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${hexColor};"></span>
+      </button>
+    `;
+  }
+
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #8e44ad; padding-bottom:10px; margin-bottom:12px;">
+      <h2 style="margin:0; font-size:18px; color:#e056fd;">🔮 WITCH SPELL GUESS</h2>
+      <button id="closeWitchModal" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Cancel</button>
+    </div>
+
+    <p style="font-size:14px; color:#dfe6e9; margin-bottom:15px;">
+      Guess the exact role of <strong style="color:#f1c40f;">${targetName}</strong>:
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 55vh; overflow-y: auto; padding-right: 4px;">
+      ${rolesGridHtml}
+    </div>
+  `;
+
+  panel.innerHTML = html;
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeWitchModal").onclick = () => container.remove();
+
+  let roleButtons = container.querySelectorAll(".witch-role-btn");
+  roleButtons.forEach(btn => {
+    btn.onclick = () => {
+      let guessedRole = parseInt(btn.getAttribute("data-roleid"));
+      container.remove();
+      submitWitchGuessResult(guessedRole, actualRole, targetNum, cardIndex, witchActorID);
+    };
+  });
+}
+
+function submitWitchGuessResult(guessedRole, actualRole, targetNum, cardIndex, witchActorID) {
+  if (guessedRole === actualRole) {
+    setPersistentAnnouncement("🔮 WITCH SPELL SUCCESS! Guessed " + getRoleName(actualRole) + "!");
+    if ([1, 9, 3, 6, 14].includes(actualRole)) {
+      winReason = "Witch Wins: Correctly guessed and eliminated a Key Role (" + getRoleName(actualRole) + ")!";
+      currentScreen = "screen8"; 
+      revealRoles();
+      return;
+    }
+
+    if (targetNum === 0) {
+      handlePlayerDeath();
+    } else {
+      isTargetAlive[targetNum - 1] = false;
+      targetCards[cardIndex].borderColor = color(155, 89, 182);
+      notifyPlayerDeath(actualRole, targetNum);
+
+      if (actualRole === 8) triggerHunterRevenge(targetNum);
+      else checkGameStatus();
+    }
+  } else {
+    setPersistentAnnouncement("🔮 WITCH SPELL FAILED! " + (targetNum === 0 ? "Your" : ("Player " + (targetNum + 1) + "'s")) + " role was not " + getRoleName(guessedRole) + "!");
+    if (witchActorID === 0) {
+      handlePlayerDeath();
+    } else {
+      isTargetAlive[witchActorID - 1] = false;
+      targetCards[witchActorID - 1].borderColor = color(231, 76, 60);
+      notifyPlayerDeath(13, witchActorID);
+      checkGameStatus();
+    }
+  }
+}
+
 // ==================== HELPER & GAMEPLAY FUNCTIONS ====================
 
 function handleRoleAction(targetNum, cardIndex) {
@@ -1434,7 +1714,7 @@ function handleRoleAction(targetNum, cardIndex) {
     setPersistentAnnouncement("Altruist Marked: Player " + (targetNum + 1) + "! Role revealed on death.");
     triggerAbilityCooldown();
   } else if (role === 13) { // WITCH
-    executeWitchGuess(targetNum, cardIndex, 0);
+    openSuperSusWitchModal(targetNum, cardIndex, 0);
     triggerAbilityCooldown();
   } else if (role === 14) { // WARDEN
     selectWardenTarget(targetNum, cardIndex);
@@ -1582,46 +1862,6 @@ function performRoleSwap(targetNum) {
 
   setPersistentAnnouncement("SWAP SUCCESS! You are now " + getRoleName(role) + "!");
   setupRoleUI();
-}
-
-function executeWitchGuess(targetNum, cardIndex, witchActorID) {
-  let actualRole = (targetNum === 0) ? role : targetRoles[targetNum - 1];
-  
-  openModal("WITCH GUESS: Enter Role ID (1-14) for Player:\n1.Killer 2.GA 3.Sheriff 4.Doc 5.Det 6.Jester\n7.Innocent 8.Hunter 9.Vamp 10.Swap 11.Hack 12.Alt 13.Witch 14.Warden", (val) => {
-    let guessedRole = parseInt(val);
-    if (isNaN(guessedRole) || guessedRole < 1 || guessedRole > 14) return;
-
-    if (guessedRole === actualRole) {
-      setPersistentAnnouncement("WITCH SPELL SUCCESS!");
-      if ([1, 9, 3, 6, 14].includes(actualRole)) {
-        winReason = "Witch Wins: Correctly guessed and eliminated a Key Role!";
-        currentScreen = "screen8"; 
-        revealRoles();
-        return;
-      }
-
-      if (targetNum === 0) {
-        handlePlayerDeath();
-      } else {
-        isTargetAlive[targetNum - 1] = false;
-        targetCards[cardIndex].borderColor = color(155, 89, 182);
-        notifyPlayerDeath(actualRole, targetNum);
-
-        if (actualRole === 8) triggerHunterRevenge(targetNum);
-        else checkGameStatus();
-      }
-    } else {
-      setPersistentAnnouncement("WITCH SPELL FAILED! Your guess was wrong!");
-      if (witchActorID === 0) {
-        handlePlayerDeath();
-      } else {
-        isTargetAlive[witchActorID - 1] = false;
-        targetCards[witchActorID - 1].borderColor = color(231, 76, 60);
-        notifyPlayerDeath(13, witchActorID);
-        checkGameStatus();
-      }
-    }
-  });
 }
 
 function executeVampireAbility(targetNum, cardIndex) {
@@ -2057,7 +2297,7 @@ function openInteractiveStaffPanel() {
     <!-- CHAT SECTION -->
     <div id="sectionChat" style="display:none;">
       <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
-        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('')}
+        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('')}
       </div>
       <div style="display:flex; gap:6px;">
         <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
@@ -2069,7 +2309,7 @@ function openInteractiveStaffPanel() {
     <div id="sectionReports" style="display:none;">
       <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
       <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
-        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b>${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
+        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
       </div>
     </div>
   `;
@@ -2175,157 +2415,4 @@ function openInteractiveStaffPanel() {
       }
     });
   };
-}
-// ==================== VECTOR BADGE RENDERER ====================
-
-function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
-  push();
-  translate(x, y);
-
-  let cHex = getRoleColorHex(roleId);
-  
-  // 1. Diamond Base Frame
-  stroke(255, 255, 255, 220);
-  strokeWeight(3);
-  fill(color(cHex));
-  beginShape();
-  vertex(0, -sz);
-  vertex(sz * 0.8, 0);
-  vertex(0, sz);
-  vertex(-sz * 0.8, 0);
-  endShape(CLOSE);
-
-  // Inner Diamond Border
-  stroke(255, 255, 255, 120);
-  strokeWeight(1.5);
-  noFill();
-  beginShape();
-  vertex(0, -sz * 0.82);
-  vertex(sz * 0.65, 0);
-  vertex(0, sz * 0.82);
-  vertex(-sz * 0.65, 0);
-  endShape(CLOSE);
-
-  // 2. Icon Vectors Based on Role ID
-  noStroke();
-  fill(255);
-
-  if (roleId === 1) { // Killer (Dagger)
-    push();
-    rotate(QUARTER_PI);
-    rect(-sz * 0.08, -sz * 0.4, sz * 0.16, sz * 0.5, 2);
-    triangle(0, -sz * 0.55, -sz * 0.12, -sz * 0.35, sz * 0.12, -sz * 0.35);
-    rect(-sz * 0.2, 0.1 * sz, sz * 0.4, sz * 0.08, 2);
-    rect(-sz * 0.08, 0.18 * sz, sz * 0.16, sz * 0.2, 2);
-    pop();
-  } 
-  else if (roleId === 2) { // Guardian Angel (Shield & Wings)
-    fill(255, 215, 0);
-    arc(-sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, HALF_PI, PI + HALF_PI);
-    arc(sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, PI + HALF_PI, HALF_PI);
-    fill(255);
-    beginShape();
-    vertex(0, -sz * 0.35);
-    vertex(sz * 0.25, -sz * 0.2);
-    vertex(sz * 0.2, sz * 0.2);
-    vertex(0, sz * 0.38);
-    vertex(-sz * 0.2, sz * 0.2);
-    vertex(-sz * 0.25, -sz * 0.2);
-    endShape(CLOSE);
-  }
-  else if (roleId === 3) { // Sheriff (6-Point Star)
-    fill(255, 223, 0);
-    push();
-    drawStarVector(0, 0, sz * 0.2, sz * 0.45, 6);
-    pop();
-  }
-  else if (roleId === 4) { // Doctor (Cross + Syringe)
-    fill(255);
-    rect(-sz * 0.1, -sz * 0.35, sz * 0.2, sz * 0.7, 3);
-    rect(-sz * 0.35, -sz * 0.1, sz * 0.7, sz * 0.2, 3);
-    stroke(46, 204, 113);
-    strokeWeight(2);
-    line(-sz * 0.2, sz * 0.2, sz * 0.2, -sz * 0.2);
-  }
-  else if (roleId === 5) { // Detective (Handcuffs)
-    stroke(255);
-    strokeWeight(3);
-    noFill();
-    ellipse(-sz * 0.18, -sz * 0.05, sz * 0.3, sz * 0.3);
-    ellipse(sz * 0.18, sz * 0.1, sz * 0.3, sz * 0.3);
-    line(-sz * 0.05, -sz * 0.05, sz * 0.05, sz * 0.1);
-  }
-  else if (roleId === 6) { // Jester (Crown)
-    fill(255);
-    beginShape();
-    vertex(-sz * 0.35, -sz * 0.1);
-    vertex(-sz * 0.25, sz * 0.2);
-    vertex(sz * 0.25, sz * 0.2);
-    vertex(sz * 0.35, -sz * 0.1);
-    vertex(sz * 0.15, 0);
-    vertex(0, -sz * 0.35);
-    vertex(-sz * 0.15, 0);
-    endShape(CLOSE);
-  }
-  else if (roleId === 11) { // Hacker (Laptop)
-    fill(255);
-    rect(-sz * 0.3, -sz * 0.25, sz * 0.6, sz * 0.38, 4);
-    fill(30);
-    rect(-sz * 0.25, -sz * 0.21, sz * 0.5, sz * 0.3);
-    fill(255);
-    rect(-sz * 0.38, sz * 0.15, sz * 0.76, sz * 0.1, 3);
-  }
-  else if (roleId === 12) { // Altruist (Nezha / Spear & Armillary)
-    fill(241, 196, 15);
-    // Nezha Red Silk Ribbon Ring
-    stroke(231, 76, 60);
-    strokeWeight(3);
-    noFill();
-    ellipse(0, 0, sz * 0.6, sz * 0.6);
-    // Spear Head
-    noStroke();
-    fill(241, 196, 15);
-    triangle(0, -sz * 0.45, -sz * 0.1, -sz * 0.1, sz * 0.1, -sz * 0.1);
-    rect(-sz * 0.03, -sz * 0.1, sz * 0.06, sz * 0.5);
-  }
-  else if (roleId === 10) { // Swapper (Arrows Loop)
-    stroke(255);
-    strokeWeight(3);
-    noFill();
-    arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
-    arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
-  }
-  else { // Generic Default Star
-    fill(255);
-    ellipse(0, 0, sz * 0.4, sz * 0.4);
-  }
-
-  // 3. Optional Label Tag at Bottom of Badge
-  if (labelText) {
-    noStroke();
-    fill(0, 0, 0, 190);
-    rect(-sz * 0.65, sz * 0.5, sz * 1.3, sz * 0.32, 4);
-    fill(255);
-    textSize(max(9, sz * 0.22));
-    textStyle(BOLD);
-    textAlign(CENTER, CENTER);
-    text(labelText, 0, sz * 0.65);
-  }
-
-  pop();
-}
-
-function drawStarVector(x, y, radius1, radius2, npoints) {
-  let angle = TWO_PI / npoints;
-  let halfAngle = angle / 2.0;
-  beginShape();
-  for (let a = 0; a < TWO_PI; a += angle) {
-    let sx = x + cos(a) * radius2;
-    let sy = y + sin(a) * radius2;
-    vertex(sx, sy);
-    sx = x + cos(a + halfAngle) * radius1;
-    sy = y + sin(a + halfAngle) * radius1;
-    vertex(sx, sy);
-  }
-  endShape(CLOSE);
 }
