@@ -2022,7 +2022,7 @@ function openDevRoleTesterPanel() {
     </p>
 
     <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role (Player 1):</label>
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role (Player 1 - Locked):</label>
       <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">
         ${roleOptionsHtml}
       </select>
@@ -2050,7 +2050,7 @@ function openDevRoleTesterPanel() {
     </div>
 
     <div style="display:flex; gap:10px; margin-top:10px;">
-      <button id="btnRandomizeRoles" style="flex:1; background:#e67e22; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🎲 Randomize Roles</button>
+      <button id="btnRandomizeRoles" style="flex:1; background:#e67e22; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🎲 Randomize Bots Only</button>
       <button id="btnStartDevMatch" style="flex:1.5; background:#00b894; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">▶ START MATCH</button>
     </div>
   `;
@@ -2066,35 +2066,26 @@ function openDevRoleTesterPanel() {
 
   document.getElementById("closeDevTester").onclick = () => container.remove();
 
-  // GUARANTEED SHERIFF & KILLER/VAMPIRE RANDOMIZER
+  // RANDOMIZE BOTS ONLY (Keep Player 1 Locked)
   document.getElementById("btnRandomizeRoles").onclick = () => {
-    let totalRoles = roleNames.length;
-    let badRole = (floor(random(1, 3)) === 1) ? 1 : 9; // Killer (1) or Vampire (9)
-    let sheriffRole = 3; // Sheriff
+    let myCurrentRole = parseInt(document.getElementById("selMyRole").value);
 
-    let remainingPool = [];
+    let totalRoles = roleNames.length;
+    let pool = [];
     for (let i = 1; i <= totalRoles; i++) {
-      if (i !== badRole && i !== sheriffRole) {
-        remainingPool.push(i);
+      if (i !== myCurrentRole) {
+        pool.push(i);
       }
     }
-    
-    for (let k = remainingPool.length - 1; k > 0; k--) {
+
+    for (let k = pool.length - 1; k > 0; k--) {
       let j = floor(random(0, k + 1));
-      let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
+      let temp = pool[k]; pool[k] = pool[j]; pool[j] = temp;
     }
 
-    let deck = [badRole, sheriffRole, remainingPool[0], remainingPool[1]];
-
-    for (let d = deck.length - 1; d > 0; d--) {
-      let r = floor(random(0, d + 1));
-      let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
-    }
-
-    document.getElementById("selMyRole").value = deck[0];
-    document.getElementById("selBot1Role").value = deck[1];
-    document.getElementById("selBot2Role").value = deck[2];
-    document.getElementById("selBot3Role").value = deck[3];
+    document.getElementById("selBot1Role").value = pool[0];
+    document.getElementById("selBot2Role").value = pool[1];
+    document.getElementById("selBot3Role").value = pool[2];
   };
 
   document.getElementById("btnStartDevMatch").onclick = () => {
@@ -2110,7 +2101,6 @@ function openDevRoleTesterPanel() {
     launchDevDebugMode(myR, b1R, b2R, b3R);
   };
 }
-
 // ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
 
 function openInGameControlsPanel() {
