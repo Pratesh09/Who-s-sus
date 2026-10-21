@@ -993,6 +993,10 @@ function joinMultiplayerRoom(code) {
     return;
   }
 
+  tryConnectPeer(code, 3);
+}
+
+function tryConnectPeer(code, retriesLeft) {
   peer = new Peer({
     host: '0.peerjs.com',
     port: 443,
@@ -1010,15 +1014,23 @@ function joinMultiplayerRoom(code) {
     });
 
     conn.on('error', (err) => {
-      statusMessage = "Connection failed. Check room code.";
-      console.error(err);
+      handlePeerConnectionFailure(code, retriesLeft, err);
     });
   });
 
   peer.on('error', (err) => {
-    statusMessage = "Could not connect to broker server.";
-    console.error(err);
+    handlePeerConnectionFailure(code, retriesLeft, err);
   });
+}
+
+function handlePeerConnectionFailure(code, retriesLeft, err) {
+  console.error("Peer connection error:", err);
+  if (retriesLeft > 1) {
+    statusMessage = "Connection failed. Retrying (" + (4 - retriesLeft) + "/3)...";
+    setTimeout(() => tryConnectPeer(code, retriesLeft - 1), 2000);
+  } else {
+    statusMessage = "Could not connect to broker server. Check network/firewall.";
+  }
 }
 
 function broadcastData(data) {
@@ -1773,7 +1785,7 @@ function triggerAbilityCooldown() {
       if (currentScreen === "screen2" && isPlayerAlive) {
         statusMessage = "⚡ COOLDOWN FROZEN (EMP JAMMED: " + cooldownTimer + "s)";
       }
-      return; // Skip decrementing the timer while frozen!
+      return; // Skip decrementing timer while frozen
     }
 
     cooldownTimer--;
@@ -1795,6 +1807,7 @@ function triggerAbilityCooldown() {
     }
   }, 1000);
 }
+
 function handlePlayerDeath() {
   isPlayerAlive = false;
   notifyPlayerDeath(role, 0);
@@ -2101,6 +2114,7 @@ function openDevRoleTesterPanel() {
     launchDevDebugMode(myR, b1R, b2R, b3R);
   };
 }
+
 // ==================== PANEL 1: IN-GAME CONTROLS MODAL ====================
 
 function openInGameControlsPanel() {
