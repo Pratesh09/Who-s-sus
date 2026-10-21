@@ -2176,3 +2176,156 @@ function openInteractiveStaffPanel() {
     });
   };
 }
+// ==================== VECTOR BADGE RENDERER ====================
+
+function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
+  push();
+  translate(x, y);
+
+  let cHex = getRoleColorHex(roleId);
+  
+  // 1. Diamond Base Frame
+  stroke(255, 255, 255, 220);
+  strokeWeight(3);
+  fill(color(cHex));
+  beginShape();
+  vertex(0, -sz);
+  vertex(sz * 0.8, 0);
+  vertex(0, sz);
+  vertex(-sz * 0.8, 0);
+  endShape(CLOSE);
+
+  // Inner Diamond Border
+  stroke(255, 255, 255, 120);
+  strokeWeight(1.5);
+  noFill();
+  beginShape();
+  vertex(0, -sz * 0.82);
+  vertex(sz * 0.65, 0);
+  vertex(0, sz * 0.82);
+  vertex(-sz * 0.65, 0);
+  endShape(CLOSE);
+
+  // 2. Icon Vectors Based on Role ID
+  noStroke();
+  fill(255);
+
+  if (roleId === 1) { // Killer (Dagger)
+    push();
+    rotate(QUARTER_PI);
+    rect(-sz * 0.08, -sz * 0.4, sz * 0.16, sz * 0.5, 2);
+    triangle(0, -sz * 0.55, -sz * 0.12, -sz * 0.35, sz * 0.12, -sz * 0.35);
+    rect(-sz * 0.2, 0.1 * sz, sz * 0.4, sz * 0.08, 2);
+    rect(-sz * 0.08, 0.18 * sz, sz * 0.16, sz * 0.2, 2);
+    pop();
+  } 
+  else if (roleId === 2) { // Guardian Angel (Shield & Wings)
+    fill(255, 215, 0);
+    arc(-sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, HALF_PI, PI + HALF_PI);
+    arc(sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, PI + HALF_PI, HALF_PI);
+    fill(255);
+    beginShape();
+    vertex(0, -sz * 0.35);
+    vertex(sz * 0.25, -sz * 0.2);
+    vertex(sz * 0.2, sz * 0.2);
+    vertex(0, sz * 0.38);
+    vertex(-sz * 0.2, sz * 0.2);
+    vertex(-sz * 0.25, -sz * 0.2);
+    endShape(CLOSE);
+  }
+  else if (roleId === 3) { // Sheriff (6-Point Star)
+    fill(255, 223, 0);
+    push();
+    drawStarVector(0, 0, sz * 0.2, sz * 0.45, 6);
+    pop();
+  }
+  else if (roleId === 4) { // Doctor (Cross + Syringe)
+    fill(255);
+    rect(-sz * 0.1, -sz * 0.35, sz * 0.2, sz * 0.7, 3);
+    rect(-sz * 0.35, -sz * 0.1, sz * 0.7, sz * 0.2, 3);
+    stroke(46, 204, 113);
+    strokeWeight(2);
+    line(-sz * 0.2, sz * 0.2, sz * 0.2, -sz * 0.2);
+  }
+  else if (roleId === 5) { // Detective (Handcuffs)
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+    ellipse(-sz * 0.18, -sz * 0.05, sz * 0.3, sz * 0.3);
+    ellipse(sz * 0.18, sz * 0.1, sz * 0.3, sz * 0.3);
+    line(-sz * 0.05, -sz * 0.05, sz * 0.05, sz * 0.1);
+  }
+  else if (roleId === 6) { // Jester (Crown)
+    fill(255);
+    beginShape();
+    vertex(-sz * 0.35, -sz * 0.1);
+    vertex(-sz * 0.25, sz * 0.2);
+    vertex(sz * 0.25, sz * 0.2);
+    vertex(sz * 0.35, -sz * 0.1);
+    vertex(sz * 0.15, 0);
+    vertex(0, -sz * 0.35);
+    vertex(-sz * 0.15, 0);
+    endShape(CLOSE);
+  }
+  else if (roleId === 11) { // Hacker (Laptop)
+    fill(255);
+    rect(-sz * 0.3, -sz * 0.25, sz * 0.6, sz * 0.38, 4);
+    fill(30);
+    rect(-sz * 0.25, -sz * 0.21, sz * 0.5, sz * 0.3);
+    fill(255);
+    rect(-sz * 0.38, sz * 0.15, sz * 0.76, sz * 0.1, 3);
+  }
+  else if (roleId === 12) { // Altruist (Nezha / Spear & Armillary)
+    fill(241, 196, 15);
+    // Nezha Red Silk Ribbon Ring
+    stroke(231, 76, 60);
+    strokeWeight(3);
+    noFill();
+    ellipse(0, 0, sz * 0.6, sz * 0.6);
+    // Spear Head
+    noStroke();
+    fill(241, 196, 15);
+    triangle(0, -sz * 0.45, -sz * 0.1, -sz * 0.1, sz * 0.1, -sz * 0.1);
+    rect(-sz * 0.03, -sz * 0.1, sz * 0.06, sz * 0.5);
+  }
+  else if (roleId === 10) { // Swapper (Arrows Loop)
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+    arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
+    arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
+  }
+  else { // Generic Default Star
+    fill(255);
+    ellipse(0, 0, sz * 0.4, sz * 0.4);
+  }
+
+  // 3. Optional Label Tag at Bottom of Badge
+  if (labelText) {
+    noStroke();
+    fill(0, 0, 0, 190);
+    rect(-sz * 0.65, sz * 0.5, sz * 1.3, sz * 0.32, 4);
+    fill(255);
+    textSize(max(9, sz * 0.22));
+    textStyle(BOLD);
+    textAlign(CENTER, CENTER);
+    text(labelText, 0, sz * 0.65);
+  }
+
+  pop();
+}
+
+function drawStarVector(x, y, radius1, radius2, npoints) {
+  let angle = TWO_PI / npoints;
+  let halfAngle = angle / 2.0;
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += angle) {
+    let sx = x + cos(a) * radius2;
+    let sy = y + sin(a) * radius2;
+    vertex(sx, sy);
+    sx = x + cos(a + halfAngle) * radius1;
+    sy = y + sin(a + halfAngle) * radius1;
+    vertex(sx, sy);
+  }
+  endShape(CLOSE);
+}
