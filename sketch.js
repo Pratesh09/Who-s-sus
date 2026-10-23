@@ -653,9 +653,14 @@ function drawGameplayScreen() {
   for (let i = 0; i < 3; i++) {
     let card = targetCards[i];
     let isAlive = isTargetAlive[i];
+    let targetNum = i + 1; // Player 2 is targetNum 1, Player 3 is 2, Player 4 is 3
 
-    stroke(card.borderColor);
-    strokeWeight(3);
+    // Check if this card is the Executioner's assigned target
+    let isExecutionerTarget = (role === 15 && executionerTargetID === targetNum);
+
+    // Apply purple border highlight if it's the Executioner target
+    stroke(isExecutionerTarget ? color(142, 68, 173) : card.borderColor);
+    strokeWeight(isExecutionerTarget ? 4 : 3);
     fill(isAlive ? color(45, 52, 54) : color(100, 30, 30));
     rect(card.x, card.y, card.w, card.h, 12);
     noStroke();
@@ -669,6 +674,14 @@ function drawGameplayScreen() {
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
     
+    // Display Executioner Target Indicator Tag on Card
+    if (isExecutionerTarget && isAlive) {
+      fill(155, 89, 182);
+      textSize(13);
+      textStyle(BOLD);
+      text("🎯 YOUR TARGET", card.x + card.w / 2, card.y + 115);
+    }
+
     if (custodyTargetID === (i + 1)) {
       fill(230, 126, 34);
       textSize(12);
