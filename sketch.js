@@ -36,7 +36,7 @@ let shieldClickX = 0;
 let shieldClickY = 0;
 let shieldClickRadius = 16;
 
-// Authorized credentials mapping (Username -> Rank)
+// Authorized credentials mapping (Username -> Rank) - INTEGRATED STAFF WHITELIST
 const authorizedUsers = {
   "pratesh09": "Dev",
   "admin": "Admin",
@@ -120,12 +120,13 @@ function saveUsername(newName) {
 }
 
 function updateLocalUserRank() {
-  let lowerUser = localUsername.toLowerCase();
+  let lowerUser = localUsername.toLowerCase().trim();
   if (authorizedUsers[lowerUser]) {
     userRank = authorizedUsers[lowerUser];
     localStorage.setItem("game_userRank", userRank);
   } else {
-    userRank = localStorage.getItem("game_userRank") || "";
+    userRank = "";
+    localStorage.removeItem("game_userRank");
   }
 }
 
