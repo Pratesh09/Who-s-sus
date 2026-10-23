@@ -1370,9 +1370,28 @@ function resetSingleplayerState() {
   altruistSelectedTarget = null;
   announcementHoldTimer = 0;
   
-  // Reset Executioner & Arsonist
   dousedPlayers = [];
-  executionerTargetID = floor(random(1, 4));
+
+  // Assign Executioner target ensuring it is NOT a key role (1, 3, 6, 9)
+  if (role === 15) {
+    let validTargetIndexes = [];
+    for (let i = 0; i < 3; i++) {
+      let r = targetRoles[i];
+      // Exclude Killer (1), Sheriff (3), Jester (6), Vampire (9)
+      if (r !== 1 && r !== 3 && r !== 6 && r !== 9) {
+        validTargetIndexes.push(i + 1); // Player number 1, 2, or 3 (corresponding to targetCards index + 1)
+      }
+    }
+    
+    // Fallback if somehow all bots are key roles
+    if (validTargetIndexes.length > 0) {
+      executionerTargetID = validTargetIndexes[floor(random(0, validTargetIndexes.length))];
+    } else {
+      executionerTargetID = floor(random(1, 4));
+    }
+  } else {
+    executionerTargetID = null;
+  }
 
   custodyTargetID = null;
   if (executionTimer) clearInterval(executionTimer);
@@ -1380,87 +1399,6 @@ function resetSingleplayerState() {
   executionCountdown = 0;
   isWardenStripped = false;
 }
-
-function startSingleplayer() {
-  resetSingleplayerState();
-  setupSingleplayerRoles();
-  setupRoleUI();
-
-  currentScreen = "Role_screen";
-  startShufflePhase();
-}
-
-function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
-  resetSingleplayerState();
-  
-  role = devRole;
-  targetRoles = [bot1Role, bot2Role, bot3Role];
-
-  setupRoleUI();
-  currentScreen = "screen2";
-  startRoleGameLoop();
-  setPersistentAnnouncement("DEV MATCH ACTIVE: Testing as " + getRoleName(role));
-}
-
-function setupSingleplayerRoles() {
-  let primaryBadRole = (floor(random(1, 3)) === 1) ? 1 : 9;
-  let townRoles = [2, 4, 5, 8, 14, 15, 16];
-  let guaranteedTown = townRoles[floor(random(0, townRoles.length))];
-  
-  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
-  for (let i = 0; i < remainingPool.length; i++) {
-    if (remainingPool[i] === guaranteedTown) {
-      remainingPool.splice(i, 1);
-      break;
-    }
-  }
-  
-  for (let k = remainingPool.length - 1; k > 0; k--) {
-    let j = floor(random(0, k + 1));
-    let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
-  }
-
-  let deck = [primaryBadRole, 3, guaranteedTown, remainingPool[0]];
-
-  for (let d = deck.length - 1; d > 0; d--) {
-    let r = floor(random(0, d + 1));
-    let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
-  }
-
-  role = deck[0];
-  for (let t = 0; t < 3; t++) {
-    targetRoles[t] = deck[t + 1];
-  }
-}
-
-function setupRoleUI() {
-  for (let i = 0; i < 3; i++) {
-    targetCards[i].borderColor = color(180);
-  }
-
-  if (role === 1) statusMessage = "Killer: Who to eliminate?";
-  else if (role === 2) statusMessage = "Guardian Angel: Who to Protect?";
-  else if (role === 3) statusMessage = "Sheriff: Who to Take down?";
-  else if (role === 4) statusMessage = "Doctor: Who to Revive?";
-  else if (role === 5) statusMessage = "Detective: Who to Investigate?";
-  else if (role === 6) statusMessage = "Jester: Select Player 2, 3, or 4 to haunt!";
-  else if (role === 7) statusMessage = "Innocent: You have no abilities. Stay alive!";
-  else if (role === 8) statusMessage = "Hunter: If eliminated, you take someone down with you!";
-  else if (role === 9) statusMessage = vampireCharges > 0 ? "Vampire Stolen Ability (" + getRoleName(stolenRole) + ") ready!" : "Vampire: Who to eliminate?";
-  else if (role === 10) statusMessage = "Swapper: Who to swap roles with?";
-  else if (role === 11) statusMessage = "Hacker: Click any player to trigger EMP!";
-  else if (role === 12) statusMessage = "Altruist: Choose a player to mark for role announcement.";
-  else if (role === 13) statusMessage = "Witch: Click a player to guess their role!";
-  else if (role === 14) statusMessage = "Warden: Select a suspect to detain!";
-  else if (role === 15) {
-    let tName = (executionerTargetID === 0) ? "You" : ("Player " + (executionerTargetID + 1));
-    statusMessage = "Executioner: Your target is " + tName + "! Get them eliminated by ANY means to win!";
-  }
-  else if (role === 16) {
-    statusMessage = "Arsonist: Douse players. Once EVERYONE living is doused, IGNITE for victory!";
-  }
-}
-
 // ==================== WARDEN HELPER FUNCTIONS ====================
 
 function selectWardenTarget(targetNum, cardIndex) {
