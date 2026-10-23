@@ -36,7 +36,7 @@ let shieldClickX = 0;
 let shieldClickY = 0;
 let shieldClickRadius = 16;
 
-// Authorized credentials mapping (Username -> Rank)[cite: 9]
+// Authorized credentials mapping (Username -> Rank)
 const authorizedUsers = {
   "pratesh09": "Dev",
   "admin": "Admin",
