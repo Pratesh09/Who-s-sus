@@ -7,7 +7,7 @@ let totalPlayersCount = 4;
 
 // LOAD PERSISTED USERNAME OR DEFAULT TO "Player"
 let localUsername = localStorage.getItem("game_localUsername") || "Player";
-let userRank = localStorage.getItem("game_userRank") || "";
+let userRank = "";
 
 // PeerJS Networking Variables
 let peer = null;
@@ -48,17 +48,6 @@ const authorizedUsers = {
   "mayank": "Admin",
   "arnav": "Dev"
 };
-function keyPressed() {
-  // F2 Key (keyCode 113 or key === "F2") opens the Staff Portal
-  if (keyCode === 113 || key === "F2") {
-    if (userRank !== "") {
-      openInteractiveStaffPanel();
-    } else {
-      triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
-    }
-    return false; // Prevent default browser behavior for F2
-  }
-}
 
 let serverBannedUsers = [];
 let serverKickedUsers = [];
@@ -1188,6 +1177,18 @@ function updateStaffReportsDOM() {
 
 // ==================== INTERACTION & EVENTS ====================
 
+function keyPressed() {
+  // F2 Key (keyCode 113 or key === "F2") opens Staff Authentication
+  if (keyCode === 113 || key === "F2") {
+    if (userRank !== "") {
+      openInteractiveStaffPanel();
+    } else {
+      triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
+    }
+    return false; // Prevents browser default F2 action
+  }
+}
+
 function mousePressed() {
   if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer") || document.getElementById("witchGuessContainer")) {
     return;
@@ -1524,7 +1525,7 @@ function setupRoleUI() {
     statusMessage = "Arsonist: Douse players. Once EVERYONE living is doused, IGNITE for victory!";
   }
   else if (role === 17) {
-    statusMessage = "Magic Killer: Click ♠️ to mark a target! If they use their ability, they DIE!";
+    statusMessage = "Magic Killer: Click card to kill, or click ♠️ to curse target!";
   }
 }
 
@@ -1724,7 +1725,7 @@ function handleRoleAction(targetNum, cardIndex) {
     return;
   }
 
-  // CHECK IF ACTOR IS CURSED BY MAGIC KILLER (MAGIC KILL KILL TRIGGER)
+  // CHECK IF ACTOR IS CURSED BY MAGIC KILLER (MAGIC KILL TRIGGER)
   if (curseMarkedTarget === 0) { 
     setPersistentAnnouncement("💀 MAGIC CURSE TRIGGERED! You used an ability while cursed and ELIMINATED!");
     handlePlayerDeath();
@@ -1762,6 +1763,7 @@ function handleRoleAction(targetNum, cardIndex) {
   }
 
   let targetRole = targetRoles[targetNum - 1];
+  let card = targetCards[cardIndex];
 
   if (role === 1) { // KILLER
     if (targetRole === 9 || targetRole === 17) {
@@ -1868,9 +1870,30 @@ function handleRoleAction(targetNum, cardIndex) {
 
     triggerAbilityCooldown();
   } else if (role === 17) { // MAGIC KILLER
-    curseMarkedTarget = targetNum;
-    targetCards[cardIndex].borderColor = color(155, 89, 182);
-    setPersistentAnnouncement("♠️ Player " + (targetNum + 1) + " cursed! Next ability use ELIMINATES them!");
+    let spadeBtnX = card.x + card.w / 2 - 25;
+    let spadeBtnY = card.y + 110;
+    let isSpadeClicked = (mouseX >= spadeBtnX && mouseX <= spadeBtnX + 50 &&
+                          mouseY >= spadeBtnY && mouseY <= spadeBtnY + 40);
+
+    if (isSpadeClicked) {
+      curseMarkedTarget = targetNum;
+      targetCards[cardIndex].borderColor = color(155, 89, 182);
+      setPersistentAnnouncement("♠️ Player " + (targetNum + 1) + " CURSED! If they use an ability, they die!");
+    } else {
+      if (targetRole === 1 || targetRole === 9) {
+        setPersistentAnnouncement("ATTACK FAILED! Magic Killer cannot eliminate Killer or Vampire!");
+      } else if (protectedPlayer === targetNum) {
+        setPersistentAnnouncement("ATTACK BLOCKED! Player " + (targetNum + 1) + " was guarded!");
+        protectedPlayer = null;
+      } else {
+        targetCards[cardIndex].borderColor = color(231, 76, 60);
+        isTargetAlive[targetNum - 1] = false;
+        notifyPlayerDeath(targetRole, targetNum);
+
+        if (targetRole === 8) triggerHunterRevenge(targetNum);
+        else checkGameStatus();
+      }
+    }
     triggerAbilityCooldown();
   }
 }
