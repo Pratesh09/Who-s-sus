@@ -64,11 +64,11 @@ const roleNames = [
   "Killer", "Guardian Angel", "Sheriff", "Doctor", 
   "Detective", "Jester", "Innocent", "Hunter", 
   "Vampire", "Swapper", "Hacker", "Altruist", "Witch", "Warden",
-  "Executioner", "Arsonist"
+  "Executioner", "Arsonist", "Magic Killer"
 ];
 
 // ROLE CLASSIFICATIONS
-const KEY_ROLES = [1, 3, 6, 9]; // Killer, Sheriff, Jester, Vampire
+const KEY_ROLES = [1, 3, 6, 9, 17]; // Killer, Sheriff, Jester, Vampire, Magic Killer
 const IMPORTANT_ROLES = [13, 15, 16]; // Witch, Executioner, Arsonist
 const SUPPORT_ROLES = [2, 4, 5, 7, 8, 10, 11, 12, 14]; // GA, Doctor, Detective, Innocent, Hunter, Swapper, Hacker, Altruist, Warden
 
@@ -93,6 +93,9 @@ let lastEliminatedRole = null;
 
 let altruistSelectedTarget = null; 
 let suspiciousTarget = 1; 
+
+// Magic Killer Mechanics Variable
+let curseMarkedTarget = null; // Stores target ID (1, 2, or 3) cursed by Magic Killer
 
 // Executioner & Arsonist Tracking
 let executionerTargetID = null; 
@@ -198,7 +201,25 @@ function draw() {
   }
 }
 
-// ==================== CUSTOM VECTOR BADGES ====================
+// ==================== VECTOR SHAPES & BADGES ====================
+
+function drawVectorSpade(x, y, sz, fillCol) {
+  push();
+  translate(x, y);
+  fill(fillCol);
+  noStroke();
+
+  // Draw Spade Head
+  beginShape();
+  vertex(0, -sz * 0.5);
+  bezierVertex(-sz * 0.5, -sz * 0.1, -sz * 0.5, sz * 0.25, 0, sz * 0.15);
+  bezierVertex(sz * 0.5, sz * 0.25, sz * 0.5, -sz * 0.1, 0, -sz * 0.5);
+  endShape(CLOSE);
+
+  // Draw Spade Stem
+  triangle(0, 0, -sz * 0.18, sz * 0.5, sz * 0.18, sz * 0.5);
+  pop();
+}
 
 function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
   push();
@@ -310,6 +331,9 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     noFill();
     arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
     arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
+  }
+  else if (roleId === 17) { // Magic Killer
+    drawVectorSpade(0, 0, sz * 0.8, color(155, 89, 182));
   }
   else {
     fill(255);
@@ -674,6 +698,16 @@ function drawGameplayScreen() {
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
     
+    // MAGIC KILLER PURPLE SPADE ♠️ ABILITY BUTTON
+    if (role === 17 && isAlive && !abilityCooldown) {
+      let isCursed = (curseMarkedTarget === targetNum);
+      fill(isCursed ? color(142, 68, 173) : color(60, 40, 75));
+      stroke(155, 89, 182);
+      strokeWeight(2);
+      rect(card.x + card.w / 2 - 25, card.y + 110, 50, 40, 8);
+      drawVectorSpade(card.x + card.w / 2, card.y + 130, 22, color(180, 100, 220));
+    }
+
     if (isExecutionerTarget && isAlive) {
       fill(155, 89, 182);
       textSize(13);
@@ -802,6 +836,7 @@ function getRoleColor(r) {
     case 14: return color(211, 84, 0);
     case 15: return color(142, 68, 173);
     case 16: return color(211, 84, 0);
+    case 17: return color(155, 89, 182);
     default: return color(255);
   }
 }
@@ -824,6 +859,7 @@ function getRoleColorHex(r) {
     case 14: return "#d35400";
     case 15: return "#8e44ad";
     case 16: return "#d35400";
+    case 17: return "#9b59b6";
     default: return "#ffffff";
   }
 }
@@ -1121,7 +1157,7 @@ function setupPeerConnectionHandlers(targetConn) {
 function updateStaffChatDOM() {
   let box = document.getElementById("chatHistoryBox");
   if (box) {
-    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
+    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b>${m.text}</div>`).join('');
     box.scrollTop = box.scrollHeight;
   }
   let tabChatBtn = document.getElementById("tabChat");
@@ -1135,12 +1171,7 @@ function updateStaffReportsDOM() {
   if (repBox) {
     let listDiv = repBox.querySelector("div:last-child");
     if (listDiv) {
-      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
-    }
-  }
-  let tabRepBtn = document.getElementById("tabReports");
-  if (tabRepBtn) {
-    tabRepBtn.innerText = `Reports (${submittedReports.length})`;
+      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b>${r.reason} (${r.time})</div>`).join(''); } } let tabRepBtn = document.getElementById("tabReports"); if (tabRepBtn) { tabRepBtn.innerText = `Reports (${submittedReports.length})`;
   }
 }
 
@@ -1367,13 +1398,13 @@ function resetSingleplayerState() {
   announcementHoldTimer = 0;
   
   dousedPlayers = [];
+  curseMarkedTarget = null;
 
   // ASSIGN EXECUTIONER TARGET TO A SUPPORT ROLE AI BOT
   if (role === 15) {
     let validSupportTargets = [];
     for (let i = 0; i < 3; i++) {
       let r = targetRoles[i];
-      // Target MUST be a SUPPORT ROLE and CANNOT be Key or Important roles
       if (SUPPORT_ROLES.includes(r)) {
         validSupportTargets.push(i + 1); // 1 = Player 2, 2 = Player 3, 3 = Player 4
       }
@@ -1382,7 +1413,6 @@ function resetSingleplayerState() {
     if (validSupportTargets.length > 0) {
       executionerTargetID = validSupportTargets[floor(random(0, validSupportTargets.length))];
     } else {
-      // Fallback: Pick any AI bot (1, 2, or 3 -> Player 2, 3, or 4), never Player 1 (You)
       executionerTargetID = floor(random(1, 4));
     }
   } else {
@@ -1424,7 +1454,8 @@ function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
 }
 
 function setupSingleplayerRoles() {
-  let primaryBadRole = (floor(random(1, 3)) === 1) ? 1 : 9;
+  let killerOptions = [1, 9, 17]; // Killer, Vampire, or Magic Killer
+  let primaryBadRole = killerOptions[floor(random(0, killerOptions.length))];
   
   let validGuaranteedSupport = [2, 4, 5, 8, 14]; 
   let guaranteedSupportRole = validGuaranteedSupport[floor(random(0, validGuaranteedSupport.length))];
@@ -1480,6 +1511,9 @@ function setupRoleUI() {
   }
   else if (role === 16) {
     statusMessage = "Arsonist: Douse players. Once EVERYONE living is doused, IGNITE for victory!";
+  }
+  else if (role === 17) {
+    statusMessage = "Magic Killer: Click ♠️ to mark a target! If they use their ability, they DIE!";
   }
 }
 
@@ -1540,7 +1574,7 @@ function executeCustodyTarget() {
 
   setPersistentAnnouncement("EXECUTED: Player " + (custodyTargetID + 1) + " (" + getRoleName(targetRole) + ") was executed by the Warden!");
 
-  if (targetRole !== 1 && targetRole !== 9) {
+  if (targetRole !== 1 && targetRole !== 9 && targetRole !== 17) {
     isWardenStripped = true;
   }
 
@@ -1679,6 +1713,13 @@ function handleRoleAction(targetNum, cardIndex) {
     return;
   }
 
+  // CHECK IF ACTOR IS CURSED BY MAGIC KILLER (MAGIC KILL KILL TRIGGER)
+  if (curseMarkedTarget === 0) { // Player 1 (You) was cursed by Magic Killer
+    setPersistentAnnouncement("💀 MAGIC CURSE TRIGGERED! You used an ability while cursed and ELIMINATED!");
+    handlePlayerDeath();
+    return;
+  }
+
   if (hunterRevengePending) {
     hunterRevengePending = false;
     let tRole = targetRoles[targetNum - 1];
@@ -1686,7 +1727,7 @@ function handleRoleAction(targetNum, cardIndex) {
     isTargetAlive[targetNum - 1] = false;
     notifyPlayerDeath(tRole, targetNum);
 
-    if (tRole === 1 || tRole === 9) {
+    if (KEY_ROLES.includes(tRole)) {
       winReason = "Town Wins: Hunter revenge-shot the " + getRoleName(tRole) + "!";
       currentScreen = "screen5"; 
       revealRoles();
@@ -1712,8 +1753,8 @@ function handleRoleAction(targetNum, cardIndex) {
   let targetRole = targetRoles[targetNum - 1];
 
   if (role === 1) { // KILLER
-    if (targetRole === 9) {
-      setPersistentAnnouncement("ATTACK FAILED! Killer cannot eliminate the Vampire!");
+    if (targetRole === 9 || targetRole === 17) {
+      setPersistentAnnouncement("ATTACK FAILED! Killer cannot eliminate Vampire or Magic Killer!");
       triggerAbilityCooldown();
       return;
     }
@@ -1736,7 +1777,7 @@ function handleRoleAction(targetNum, cardIndex) {
     setPersistentAnnouncement("You are guarding Player " + (targetNum + 1) + ".");
     triggerAbilityCooldown();
   } else if (role === 3) { // SHERIFF
-    if (targetRole === 1 || targetRole === 9) { 
+    if (targetRole === 1 || targetRole === 9 || targetRole === 17) { 
       targetCards[cardIndex].borderColor = color(231, 76, 60);
       winReason = "Town Wins: Sheriff shot the " + getRoleName(targetRole) + "!";
       currentScreen = "screen5"; 
@@ -1763,7 +1804,7 @@ function handleRoleAction(targetNum, cardIndex) {
     checkGameStatus();
     triggerAbilityCooldown();
   } else if (role === 5) { // DETECTIVE
-    let res = (suspiciousTarget === targetNum || targetRole === 1 || targetRole === 9 || targetRole === 16) ? "SUSPICIOUS!" : "INNOCENT.";
+    let res = (suspiciousTarget === targetNum || targetRole === 1 || targetRole === 9 || targetRole === 16 || targetRole === 17) ? "SUSPICIOUS!" : "INNOCENT.";
     setPersistentAnnouncement("Result: Player " + (targetNum + 1) + " is " + res);
     triggerAbilityCooldown();
   } else if (role === 6) { // JESTER
@@ -1814,6 +1855,11 @@ function handleRoleAction(targetNum, cardIndex) {
       return;
     }
 
+    triggerAbilityCooldown();
+  } else if (role === 17) { // MAGIC KILLER
+    curseMarkedTarget = targetNum;
+    targetCards[cardIndex].borderColor = color(155, 89, 182);
+    setPersistentAnnouncement("♠️ Player " + (targetNum + 1) + " cursed! Next ability use ELIMINATES them!");
     triggerAbilityCooldown();
   }
 }
@@ -1935,7 +1981,7 @@ function triggerHunterRevenge(victimID) {
         setPersistentAnnouncement("Hunter Player " + (victimID + 1) + " revenge-shot Player " + (revengeTarget + 1) + "!");
       }
 
-      if (revTargetRole === 1 || revTargetRole === 9) {
+      if (KEY_ROLES.includes(revTargetRole)) {
         winReason = "Town Wins: Hunter revenge-shot the " + getRoleName(revTargetRole) + "!";
         currentScreen = "screen5"; 
         revealRoles();
@@ -1962,8 +2008,8 @@ function triggerHackerEmp() {
 function performRoleSwap(targetNum) {
   let targetRole = targetRoles[targetNum - 1];
 
-  if (targetRole === 1 || targetRole === 9) {
-    setPersistentAnnouncement("SWAP FAILED! Attempted swap with Killer/Vampire and eliminated!");
+  if (targetRole === 1 || targetRole === 9 || targetRole === 17) {
+    setPersistentAnnouncement("SWAP FAILED! Attempted swap with Killer/Vampire/Magic Killer and eliminated!");
     handlePlayerDeath();
     return;
   }
@@ -1987,8 +2033,8 @@ function executeVampireAbility(targetNum, cardIndex) {
     return;
   }
 
-  if (targetRole === 1) {
-    setPersistentAnnouncement("ATTACK FAILED! Vampire cannot eliminate the Killer!");
+  if (targetRole === 1 || targetRole === 17) {
+    setPersistentAnnouncement("ATTACK FAILED! Vampire cannot eliminate Killer or Magic Killer!");
     triggerAbilityCooldown();
     return;
   }
@@ -2013,6 +2059,17 @@ function executeVampireAbility(targetNum, cardIndex) {
 function executeAiRole(actorID, actorRole, allowsSheriffToFireThisTurn) {
   if (isMultiplayer || empActive || manualEmpLock || disabledRolePlayers.includes(actorID) || isBlackoutActive) return;
 
+  // CHECK IF AI ACTOR IS CURSED BY MAGIC KILLER (AI MAGIC KILL KILL TRIGGER)
+  if (curseMarkedTarget === actorID) {
+    setPersistentAnnouncement("💀 MAGIC CURSE TRIGGERED! Player " + (actorID + 1) + " used an ability while cursed and ELIMINATED!");
+    isTargetAlive[actorID - 1] = false;
+    targetCards[actorID - 1].borderColor = color(231, 76, 60);
+    notifyPlayerDeath(actorRole, actorID);
+    curseMarkedTarget = null;
+    checkGameStatus();
+    return;
+  }
+
   let aliveAiTargets = [];
   for (let i = 0; i < totalPlayersCount - 1; i++) {
     if (actorID !== (i + 1) && isTargetAlive[i]) {
@@ -2020,7 +2077,7 @@ function executeAiRole(actorID, actorRole, allowsSheriffToFireThisTurn) {
     }
   }
 
-  if (actorRole === 1 || actorRole === 9) {
+  if (actorRole === 1 || actorRole === 9 || actorRole === 17) {
     let possibleTargets = [];
     if (isPlayerAlive) possibleTargets.push(0);
     for (let m = 0; m < aliveAiTargets.length; m++) possibleTargets.push(aliveAiTargets[m]);
@@ -2058,19 +2115,19 @@ function startRoleGameLoop() {
 function checkGameStatus() {
   if (currentScreen !== "screen2") return;
 
-  let isKillerAlive = (role === 1 || role === 9) && isPlayerAlive;
+  let isKillerAlive = ([1, 9, 17].includes(role)) && isPlayerAlive;
   for (let k = 0; k < totalPlayersCount - 1; k++) {
-    if ((targetRoles[k] === 1 || targetRoles[k] === 9) && isTargetAlive[k]) isKillerAlive = true;
+    if ([1, 9, 17].includes(targetRoles[k]) && isTargetAlive[k]) isKillerAlive = true;
   }
 
   let nonKillerAliveCount = 0;
-  if (role !== 1 && role !== 9 && isPlayerAlive) nonKillerAliveCount++;
+  if (![1, 9, 17].includes(role) && isPlayerAlive) nonKillerAliveCount++;
   for (let t = 0; t < totalPlayersCount - 1; t++) {
-    if (targetRoles[t] !== 1 && targetRoles[t] !== 9 && isTargetAlive[t]) nonKillerAliveCount++;
+    if (![1, 9, 17].includes(targetRoles[t]) && isTargetAlive[t]) nonKillerAliveCount++;
   }
 
   if (!isKillerAlive) {
-    winReason = "Town Wins: Killer/Vampire eliminated!";
+    winReason = "Town Wins: Killer/Vampire/Magic Killer eliminated!";
     currentScreen = "screen5"; 
     revealRoles();
   } else if (nonKillerAliveCount <= 0) {
@@ -2112,7 +2169,7 @@ function openDevRoleTesterPanel() {
     text-align: left;
   `;
 
-  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
+  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}.${rName}</option>`).join('');
 
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
@@ -2162,7 +2219,7 @@ function openDevRoleTesterPanel() {
   container.appendChild(panel);
   document.body.appendChild(container);
 
-  document.getElementById("selMyRole").value = "1";    
+  document.getElementById("selMyRole").value = "17";   // Default to Magic Killer for testing!
   document.getElementById("selBot1Role").value = "3"; 
   document.getElementById("selBot2Role").value = "4"; 
   document.getElementById("selBot3Role").value = "8"; 
@@ -2240,281 +2297,4 @@ function openInGameControlsPanel() {
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-      <button id="btnIgBlackout" style="background:#d63031; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🚨 Blackout Interrogation</button>
-      <button id="btnIgMute" style="background:#f39c12; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🔇 Mute Player</button>
-      <button id="btnIgBan" style="background:#c0392b; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">⛔ Ban Player</button>
-      <button id="btnIgKick" style="background:#e67e22; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">🥾 Kick Player</button>
-    </div>
-    
-    <div style="margin-top:10px;">
-      <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeIgPanel").onclick = () => container.remove();
-
-  document.getElementById("btnIgBlackout").onclick = () => {
-    openModal("Select Player ID to interrogate (0 for You, 1-3 for Players):", (tVal) => {
-      let targetID = parseInt(tVal);
-      if (!isNaN(targetID) && targetID >= 0 && targetID <= 3) {
-        blackoutTargetPlayer = targetID;
-        isBlackoutActive = true;
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgMute").onclick = () => {
-    openModal("Enter username of player to MUTE:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverMutedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been MUTED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgBan").onclick = () => {
-    openModal("Enter username of player to BAN:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverBannedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " HAS BEEN BANNED!");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgKick").onclick = () => {
-    openModal("Enter username of player to KICK:", (targetUser) => {
-      let name = targetUser.trim();
-      if (name !== "") {
-        serverKickedUsers.push(name);
-        setPersistentAnnouncement("In-Game Action: " + name + " has been KICKED.");
-        container.remove();
-      }
-    });
-  };
-
-  document.getElementById("btnIgEmp").onclick = () => {
-    openModal("Select Player ID to DISABLE ability (0 for You, 1-3 for Players):", (dVal) => {
-      let dID = parseInt(dVal);
-      if (!isNaN(dID) && dID >= 0 && dID <= 3) {
-        disabledRolePlayers.push(dID);
-        setPersistentAnnouncement("In-Game Action: EMP jammed ability for Player " + (dID === 0 ? "You" : (dID + 1)));
-        container.remove();
-      }
-    });
-  };
-}
-
-// ==================== PANEL 2: STAFF PORTAL MODAL ====================
-
-function openInteractiveStaffPanel() {
-  let existingModal = document.getElementById("staffPanelContainer");
-  if (existingModal) existingModal.remove();
-
-  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
-  let isDev = (userRank === "Dev");
-
-  let container = document.createElement("div");
-  container.id = "staffPanelContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  container.onclick = (e) => e.stopPropagation();
-  container.onmousedown = (e) => e.stopPropagation();
-  container.ontouchstart = (e) => e.stopPropagation();
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
-    max-height: 80vh; overflow-y: auto; text-align: left;
-  `;
-
-  let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
-      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-
-    <!-- TAB BUTTONS -->
-    <div style="display:flex; gap:10px; margin-bottom:15px;">
-      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Portal Controls</button>
-      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Staff Chat (${staffChatMessages.length})</button>
-      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Reports (${submittedReports.length})</button>
-    </div>
-
-    <!-- CONTROLS SECTION -->
-    <div id="sectionControls">
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Global Server Controls</h3>
-      
-      ${isDevOrAdmin ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Shut Down Active Servers:</strong></span>
-        <button id="btnShutdownServer" style="background:#e74c3c; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">⚡ SHUT DOWN ALL</button>
-      </div>
-      ` : ''}
-
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Global EMP Jammer Switch:</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleEmpSwitch" ${manualEmpLock ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderEmp" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${manualEmpLock ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-
-      <h3 style="font-size:16px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Features</h3>
-      ${isDev ? `
-      <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; background:#1e272e; padding:10px; border-radius:6px;">
-        <span><strong>Dev Sandbox (View Bot Roles):</strong></span>
-        <label style="position:relative; display:inline-block; width:44px; height:24px;">
-          <input type="checkbox" id="toggleBotDisplaySwitch" ${isDevModeActive ? 'checked' : ''} style="opacity:0; width:0; height:0;">
-          <span id="sliderBot" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${isDevModeActive ? '#00cec9' : '#636e72'}; transition:.4s; border-radius:24px;"></span>
-        </label>
-      </div>
-      <div style="margin-top:10px;">
-        <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🧪 Launch Dev Role Tester</button>
-      </div>
-      ` : `
-      <div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:13px; text-align:center;">
-        🔒 Dev Sandbox is restricted to <b>Dev</b> rank only.
-      </div>
-      `}
-    </div>
-
-    <!-- CHAT SECTION -->
-    <div id="sectionChat" style="display:none;">
-      <div id="chatHistoryBox" style="background:#1e272e; height:180px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px; margin-bottom:10px;">
-        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('')}
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none;">
-        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">Send</button>
-      </div>
-    </div>
-
-    <!-- REPORTS SECTION -->
-    <div id="sectionReports" style="display:none;">
-      <button id="btnReportNewPlayer" style="background:#00b894; color:white; border:none; padding:8px; width:100%; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:10px;">+ Report Player to Admin</button>
-      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:13px;">
-        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
-      </div>
-    </div>
-  `;
-
-  panel.innerHTML = html;
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeStaffPanel").onclick = () => container.remove();
-
-  let sControls = document.getElementById("sectionControls");
-  let sChat = document.getElementById("sectionChat");
-  let sReports = document.getElementById("sectionReports");
-  let tControls = document.getElementById("tabControls");
-  let tChat = document.getElementById("tabChat");
-  let tReports = document.getElementById("tabReports");
-
-  tControls.onclick = () => {
-    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none";
-    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72";
-  };
-  tChat.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none";
-    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72";
-  };
-  tReports.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block";
-    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3";
-  };
-
-  if (isDevOrAdmin) {
-    document.getElementById("btnShutdownServer").onclick = () => {
-      if (gameLoopInterval) clearInterval(gameLoopInterval);
-      if (executionTimer) clearInterval(executionTimer);
-      if (peer) peer.destroy();
-      currentScreen = "screen0";
-      setPersistentAnnouncement("STAFF ACTION: All active room servers shut down!");
-      container.remove();
-    };
-  }
-
-  let toggleEmp = document.getElementById("toggleEmpSwitch");
-  if (toggleEmp) {
-    toggleEmp.onchange = (e) => {
-      manualEmpLock = e.target.checked;
-      document.getElementById("sliderEmp").style.backgroundColor = manualEmpLock ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
-    };
-  }
-
-  let toggleBot = document.getElementById("toggleBotDisplaySwitch");
-  if (toggleBot) {
-    toggleBot.onchange = (e) => {
-      isDevModeActive = e.target.checked;
-      document.getElementById("sliderBot").style.backgroundColor = isDevModeActive ? '#00cec9' : '#636e72';
-      setPersistentAnnouncement("Dev Sandbox Bot Display: " + (isDevModeActive ? "VISIBLE" : "HIDDEN"));
-    };
-  }
-
-  let btnDevTester = document.getElementById("btnOpenDevTester");
-  if (btnDevTester) {
-    btnDevTester.onclick = () => {
-      openDevRoleTesterPanel();
-    };
-  }
-
-  document.getElementById("btnSendChatMsg").onclick = () => {
-    let inp = document.getElementById("chatInputText");
-    let msg = inp.value.trim();
-    if (msg !== "") {
-      let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
-      staffChatMessages.push(chatObj);
-      saveStaffChat();
-      inp.value = "";
-      updateStaffChatDOM();
-
-      if (isMultiplayer) {
-        broadcastData({ type: "STAFF_CHAT", message: chatObj });
-      }
-    }
-  };
-
-  document.getElementById("btnReportNewPlayer").onclick = () => {
-    openModal("Enter the username of the player you want to report:", (targetUser) => {
-      let suspect = targetUser.trim();
-      if (suspect !== "") {
-        openModal("Enter reason for reporting " + suspect + ":", (reasonVal) => {
-          let reason = reasonVal.trim();
-          if (reason !== "") {
-            let reportObj = { reporter: localUsername, suspect: suspect, reason: reason, time: new Date().toLocaleTimeString() };
-            submittedReports.push(reportObj);
-            saveStaffReports();
-            setPersistentAnnouncement("Report successfully filed against " + suspect + "!");
-            updateStaffReportsDOM();
-
-            if (isMultiplayer) {
-              broadcastData({ type: "STAFF_REPORT", report: reportObj });
-            }
-
-            container.remove();
-          }
-        });
-      }
-    });
-  };
-}
+      <button id="btnIgBlackout
