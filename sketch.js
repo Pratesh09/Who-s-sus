@@ -1178,17 +1178,84 @@ function updateStaffReportsDOM() {
 // ==================== INTERACTION & EVENTS ====================
 
 function keyPressed() {
-  // F2 Key (keyCode 113 or key === "F2") opens Staff Authentication
-  if (keyCode === 113 || key === "F2") {
-    if (userRank !== "") {
-      openInteractiveStaffPanel();
+  // 1. ESCAPE KEY -> Close any open modal/popup window
+  if (keyCode === 27) { // 27 = Esc
+    let modals = [
+      "staffPanelContainer", 
+      "inGameControlsContainer", 
+      "devTesterContainer", 
+      "creditsPanelContainer", 
+      "witchGuessContainer"
+    ];
+    modals.forEach(id => {
+      let el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    return false;
+  }
+
+  // 2. TAB KEY -> Quick toggle Staff Portal
+  if (keyCode === 9) { // 9 = Tab
+    let staffModal = document.getElementById("staffPanelContainer");
+    if (staffModal) {
+      staffModal.remove();
     } else {
-      triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
+      if (userRank !== "") {
+        openInteractiveStaffPanel();
+      } else {
+        triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
+      }
     }
-    return false; // Prevents browser default F2 action
+    return false; // Prevent tab focus change in browser
+  }
+
+  // 3. F2 HOTKEYS (F2, Alt+F2, Shift+F2)
+  if (keyCode === 113 || key === "F2") {
+    
+    // SHIFT + F2 -> Open Dev Role Tester
+    if (keyIsDown(SHIFT)) {
+      if (userRank === "Dev") {
+        openDevRoleTesterPanel();
+      } else {
+        triggerStaffCredentialsPrompt(() => openDevRoleTesterPanel());
+      }
+      return false;
+    }
+    
+    // ALT + F2 -> Open In-Game Moderation Controls (Gameplay only)
+    if (keyIsDown(ALT)) {
+      if (currentScreen === "screen2") {
+        if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
+          openInGameControlsPanel();
+        } else {
+          triggerStaffCredentialsPrompt(() => openInGameControlsPanel());
+        }
+      } else {
+        setPersistentAnnouncement("In-Game Controls can only be opened while inside a game match!");
+      }
+      return false;
+    } 
+    
+    // REGULAR F2 -> Open Official Staff Portal
+    else {
+      if (userRank !== "") {
+        openInteractiveStaffPanel();
+      } else {
+        triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
+      }
+      return false;
+    }
+  }
+
+  // 4. GAMEPLAY SHORTCUTS (Only active while in active match)
+  if (currentScreen === "screen2") {
+    // 'R' KEY -> Quick Report Player
+    if (key === 'r' || key === 'R') {
+      triggerNonStaffReportModal();
+      return false;
+    }
   }
 }
-
 function mousePressed() {
   if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer") || document.getElementById("witchGuessContainer")) {
     return;
