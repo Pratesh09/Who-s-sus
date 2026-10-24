@@ -48,6 +48,17 @@ const authorizedUsers = {
   "mayank": "Admin",
   "arnav": "Dev"
 };
+function keyPressed() {
+  // F2 Key (keyCode 113 or key === "F2") opens the Staff Portal
+  if (keyCode === 113 || key === "F2") {
+    if (userRank !== "") {
+      openInteractiveStaffPanel();
+    } else {
+      triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
+    }
+    return false; // Prevent default browser behavior for F2
+  }
+}
 
 let serverBannedUsers = [];
 let serverKickedUsers = [];
@@ -133,14 +144,9 @@ function saveUsername(newName) {
 }
 
 function updateLocalUserRank() {
-  let lowerUser = localUsername.toLowerCase().trim();
-  if (authorizedUsers[lowerUser]) {
-    userRank = authorizedUsers[lowerUser];
-    localStorage.setItem("game_userRank", userRank);
-  } else {
-    userRank = "";
-    localStorage.removeItem("game_userRank");
-  }
+  // Only load rank if previously authenticated via Staff Assist / F2 (code 9315)
+  let savedRank = localStorage.getItem("game_userRank") || "";
+  userRank = savedRank;
 }
 
 function getRoleName(roleNum) {
