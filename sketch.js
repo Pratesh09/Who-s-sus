@@ -67,6 +67,11 @@ const roleNames = [
   "Executioner", "Arsonist"
 ];
 
+// ROLE CLASSIFICATIONS
+const KEY_ROLES = [1, 3, 6, 9]; // Killer, Sheriff, Jester, Vampire
+const IMPORTANT_ROLES = [13, 15, 16]; // Witch, Executioner, Arsonist
+const SUPPORT_ROLES = [2, 4, 5, 7, 8, 10, 11, 12, 14]; // GA, Doctor, Detective, Innocent, Hunter, Swapper, Hacker, Altruist, Warden
+
 let role = 0;         
 let targetRoles = [0, 0, 0]; 
 
@@ -650,7 +655,7 @@ function drawGameplayScreen() {
   for (let i = 0; i < 3; i++) {
     let card = targetCards[i];
     let isAlive = isTargetAlive[i];
-    let targetNum = i + 1;
+    let targetNum = i + 1; // 1 = Player 2, 2 = Player 3, 3 = Player 4
 
     let isExecutionerTarget = (role === 15 && executionerTargetID === targetNum);
 
@@ -1363,19 +1368,21 @@ function resetSingleplayerState() {
   
   dousedPlayers = [];
 
-  // Assign Executioner target ensuring it is NOT a key role (1, 3, 6, 9)
+  // ASSIGN EXECUTIONER TARGET TO A SUPPORT ROLE AI BOT
   if (role === 15) {
-    let validTargetIndexes = [];
+    let validSupportTargets = [];
     for (let i = 0; i < 3; i++) {
       let r = targetRoles[i];
-      if (r !== 1 && r !== 3 && r !== 6 && r !== 9) {
-        validTargetIndexes.push(i + 1);
+      // Target MUST be a SUPPORT ROLE and CANNOT be Key or Important roles
+      if (SUPPORT_ROLES.includes(r)) {
+        validSupportTargets.push(i + 1); // 1 = Player 2, 2 = Player 3, 3 = Player 4
       }
     }
     
-    if (validTargetIndexes.length > 0) {
-      executionerTargetID = validTargetIndexes[floor(random(0, validTargetIndexes.length))];
+    if (validSupportTargets.length > 0) {
+      executionerTargetID = validSupportTargets[floor(random(0, validSupportTargets.length))];
     } else {
+      // Fallback: Pick any AI bot (1, 2, or 3 -> Player 2, 3, or 4), never Player 1 (You)
       executionerTargetID = floor(random(1, 4));
     }
   } else {
@@ -1390,8 +1397,8 @@ function resetSingleplayerState() {
 }
 
 function startSingleplayer() {
-  resetSingleplayerState();
   setupSingleplayerRoles();
+  resetSingleplayerState();
   setupRoleUI();
 
   currentScreen = "Role_screen";
@@ -1399,10 +1406,10 @@ function startSingleplayer() {
 }
 
 function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
-  resetSingleplayerState();
-  
   role = devRole;
   targetRoles = [bot1Role, bot2Role, bot3Role];
+
+  resetSingleplayerState();
 
   setupRoleUI();
   currentScreen = "screen2";
@@ -1410,7 +1417,7 @@ function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
 
   if (role === 15) {
     let tName = (executionerTargetID === 0) ? "You" : ("Player " + (executionerTargetID + 1));
-    setPersistentAnnouncement("DEV MATCH: Executioner assigned to eliminate " + tName + "!");
+    setPersistentAnnouncement("DEV MATCH: Executioner target assigned to " + tName + "!");
   } else {
     setPersistentAnnouncement("DEV MATCH ACTIVE: Testing as " + getRoleName(role));
   }
@@ -1418,12 +1425,13 @@ function launchDevDebugMode(devRole, bot1Role, bot2Role, bot3Role) {
 
 function setupSingleplayerRoles() {
   let primaryBadRole = (floor(random(1, 3)) === 1) ? 1 : 9;
-  let townRoles = [2, 4, 5, 8, 14, 15, 16];
-  let guaranteedTown = townRoles[floor(random(0, townRoles.length))];
+  
+  let validGuaranteedSupport = [2, 4, 5, 8, 14]; 
+  let guaranteedSupportRole = validGuaranteedSupport[floor(random(0, validGuaranteedSupport.length))];
   
   let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
   for (let i = 0; i < remainingPool.length; i++) {
-    if (remainingPool[i] === guaranteedTown) {
+    if (remainingPool[i] === guaranteedSupportRole) {
       remainingPool.splice(i, 1);
       break;
     }
@@ -1434,7 +1442,7 @@ function setupSingleplayerRoles() {
     let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
   }
 
-  let deck = [primaryBadRole, 3, guaranteedTown, remainingPool[0]];
+  let deck = [primaryBadRole, 3, guaranteedSupportRole, remainingPool[0]];
 
   for (let d = deck.length - 1; d > 0; d--) {
     let r = floor(random(0, d + 1));
@@ -1626,7 +1634,7 @@ function openSuperSusWitchModal(targetNum, cardIndex, witchActorID) {
 function submitWitchGuessResult(guessedRole, actualRole, targetNum, cardIndex, witchActorID) {
   if (guessedRole === actualRole) {
     setPersistentAnnouncement("🔮 WITCH SPELL SUCCESS! Guessed " + getRoleName(actualRole) + "!");
-    if ([1, 9, 3, 6, 14].includes(actualRole)) {
+    if (KEY_ROLES.includes(actualRole) || actualRole === 14) {
       winReason = "Witch Wins: Correctly guessed and eliminated a Key Role (" + getRoleName(actualRole) + ")!";
       currentScreen = "screen8"; 
       revealRoles();
