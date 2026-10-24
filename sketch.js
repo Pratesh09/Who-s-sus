@@ -1256,6 +1256,7 @@ function keyPressed() {
     }
   }
 }
+
 function mousePressed() {
   if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer") || document.getElementById("witchGuessContainer")) {
     return;
