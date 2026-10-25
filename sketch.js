@@ -15,6 +15,12 @@ let conn = null;
 let connectedPeersList = [];
 let activePeerConnections = [];
 
+// Custom Card Avatar Upload Variables
+let fileInput;
+let myProfileImage = null;
+let myProfileImageBase64 = "";
+let playerImagesMap = {};
+
 // VIEW ROLES OFF BY DEFAULT
 let isDevModeActive = false; 
 let showShieldIcon = false; 
@@ -155,12 +161,39 @@ function setup() {
   suspiciousTarget = floor(random(1, 4));
   setupTargetCardBounds();
   updateLocalUserRank();
+
+  // Custom Card Image Upload Button
+  fileInput = createFileInput(handleImageUpload);
+  fileInput.position(20, height - 45);
+  fileInput.style('color', '#ffffff');
+  fileInput.style('font-size', '12px');
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   setupTargetCardBounds();
   setupShuffleCards();
+  if (fileInput) fileInput.position(20, height - 45);
+}
+
+function handleImageUpload(file) {
+  if (file.type === 'image') {
+    myProfileImageBase64 = file.data;
+    myProfileImage = loadImage(file.data, () => {
+      playerImagesMap[localUsername] = myProfileImage;
+    });
+
+    if (isMultiplayer) {
+      broadcastData({
+        type: "UPDATE_AVATAR",
+        username: localUsername,
+        imgData: myProfileImageBase64
+      });
+    }
+    setPersistentAnnouncement("Custom card avatar updated!");
+  } else {
+    setPersistentAnnouncement("Please upload a valid image file!");
+  }
 }
 
 function draw() {
@@ -204,14 +237,12 @@ function drawVectorSpade(x, y, sz, fillCol) {
   fill(fillCol);
   noStroke();
 
-  // Draw Spade Head
   beginShape();
   vertex(0, -sz * 0.5);
   bezierVertex(-sz * 0.5, -sz * 0.1, -sz * 0.5, sz * 0.25, 0, sz * 0.15);
   bezierVertex(sz * 0.5, sz * 0.25, sz * 0.5, -sz * 0.1, 0, -sz * 0.5);
   endShape(CLOSE);
 
-  // Draw Spade Stem
   triangle(0, 0, -sz * 0.18, sz * 0.5, sz * 0.18, sz * 0.5);
   pop();
 }
@@ -245,7 +276,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
   noStroke();
   fill(255);
 
-  if (roleId === 1) { // Killer
+  if (roleId === 1) {
     push();
     rotate(QUARTER_PI);
     rect(-sz * 0.08, -sz * 0.4, sz * 0.16, sz * 0.5, 2);
@@ -254,7 +285,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     rect(-sz * 0.08, 0.18 * sz, sz * 0.16, sz * 0.2, 2);
     pop();
   } 
-  else if (roleId === 2) { // GA
+  else if (roleId === 2) {
     fill(255, 215, 0);
     arc(-sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, HALF_PI, PI + HALF_PI);
     arc(sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, PI + HALF_PI, HALF_PI);
@@ -268,13 +299,13 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     vertex(-sz * 0.25, -sz * 0.2);
     endShape(CLOSE);
   }
-  else if (roleId === 3) { // Sheriff
+  else if (roleId === 3) {
     fill(255, 223, 0);
     push();
     drawStarVector(0, 0, sz * 0.2, sz * 0.45, 6);
     pop();
   }
-  else if (roleId === 4) { // Doctor
+  else if (roleId === 4) {
     fill(255);
     rect(-sz * 0.1, -sz * 0.35, sz * 0.2, sz * 0.7, 3);
     rect(-sz * 0.35, -sz * 0.1, sz * 0.7, sz * 0.2, 3);
@@ -282,7 +313,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     strokeWeight(2);
     line(-sz * 0.2, sz * 0.2, sz * 0.2, -sz * 0.2);
   }
-  else if (roleId === 5) { // Detective
+  else if (roleId === 5) {
     stroke(255);
     strokeWeight(3);
     noFill();
@@ -290,7 +321,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     ellipse(sz * 0.18, sz * 0.1, sz * 0.3, sz * 0.3);
     line(-sz * 0.05, -sz * 0.05, sz * 0.05, sz * 0.1);
   }
-  else if (roleId === 6) { // Jester
+  else if (roleId === 6) {
     fill(255);
     beginShape();
     vertex(-sz * 0.35, -sz * 0.1);
@@ -302,7 +333,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     vertex(-sz * 0.15, 0);
     endShape(CLOSE);
   }
-  else if (roleId === 11) { // Hacker
+  else if (roleId === 11) {
     fill(255);
     rect(-sz * 0.3, -sz * 0.25, sz * 0.6, sz * 0.38, 4);
     fill(30);
@@ -310,7 +341,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     fill(255);
     rect(-sz * 0.38, sz * 0.15, sz * 0.76, sz * 0.1, 3);
   }
-  else if (roleId === 12) { // Altruist
+  else if (roleId === 12) {
     stroke(231, 76, 60);
     strokeWeight(3);
     noFill();
@@ -320,14 +351,14 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     triangle(0, -sz * 0.45, -sz * 0.1, -sz * 0.1, sz * 0.1, -sz * 0.1);
     rect(-sz * 0.03, -sz * 0.1, sz * 0.06, sz * 0.5);
   }
-  else if (roleId === 10) { // Swapper
+  else if (roleId === 10) {
     stroke(255);
     strokeWeight(3);
     noFill();
     arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
     arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
   }
-  else if (roleId === 17) { // Magic Killer
+  else if (roleId === 17) {
     drawVectorSpade(0, 0, sz * 0.8, color(155, 89, 182));
   }
   else {
@@ -678,20 +709,34 @@ function drawGameplayScreen() {
 
     let isExecutionerTarget = (role === 15 && executionerTargetID === targetNum);
 
+    // Check if connected peer has a custom uploaded avatar image
+    let targetUsername = connectedPeersList[i] || ("Player " + (i + 2));
+    let customImg = playerImagesMap[targetUsername];
+
     stroke(isExecutionerTarget ? color(142, 68, 173) : card.borderColor);
     strokeWeight(isExecutionerTarget ? 4 : 3);
-    fill(isAlive ? color(45, 52, 54) : color(100, 30, 30));
-    rect(card.x, card.y, card.w, card.h, 12);
+
+    if (customImg) {
+      image(customImg, card.x, card.y, card.w, card.h);
+      // Dark tint overlay if eliminated
+      if (!isAlive) {
+        fill(100, 30, 30, 150);
+        rect(card.x, card.y, card.w, card.h, 12);
+      }
+    } else {
+      fill(isAlive ? color(45, 52, 54) : color(100, 30, 30));
+      rect(card.x, card.y, card.w, card.h, 12);
+    }
     noStroke();
 
     fill(255);
-    textSize(28);
+    textSize(24);
     textStyle(BOLD);
-    text(card.label, card.x + card.w / 2, card.y + 45);
+    text(card.label, card.x + card.w / 2, card.y + 35);
 
     textSize(14);
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
-    text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 90);
+    text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 70);
     
     // MAGIC KILLER PURPLE SPADE ♠️ ABILITY BUTTON
     if (role === 17 && isAlive && !abilityCooldown) {
@@ -1063,7 +1108,7 @@ function tryConnectPeer(code, retriesLeft) {
     conn.on('open', () => {
       statusMessage = "Connected to room: " + code;
       setupPeerConnectionHandlers(conn);
-      conn.send({ type: "JOIN", name: localUsername });
+      conn.send({ type: "JOIN", name: localUsername, avatar: myProfileImageBase64 });
     });
 
     conn.on('error', (err) => {
@@ -1104,6 +1149,9 @@ function setupPeerConnectionHandlers(targetConn) {
       if (!connectedPeersList.includes(data.name)) {
         connectedPeersList.push(data.name);
       }
+      if (data.avatar) {
+        playerImagesMap[data.name] = loadImage(data.avatar);
+      }
       statusMessage = data.name + " joined the room!";
       
       if (isHost) {
@@ -1113,6 +1161,8 @@ function setupPeerConnectionHandlers(targetConn) {
       }
     } else if (data.type === "SYNC_PEERS") {
       connectedPeersList = data.list;
+    } else if (data.type === "UPDATE_AVATAR") {
+      playerImagesMap[data.username] = loadImage(data.imgData);
     } else if (data.type === "SYNC_STAFF_CHAT") {
       staffChatMessages = data.messages;
       saveStaffChat();
@@ -1175,11 +1225,11 @@ function updateStaffReportsDOM() {
   }
 }
 
-// ==================== INTERACTION & EVENTS ====================
+// ==================== INTERACTION & HOTKEYS ====================
 
 function keyPressed() {
   // 1. ESCAPE KEY -> Close any open modal/popup window
-  if (keyCode === 27) { // 27 = Esc
+  if (keyCode === 27) {
     let modals = [
       "staffPanelContainer", 
       "inGameControlsContainer", 
@@ -1195,7 +1245,7 @@ function keyPressed() {
   }
 
   // 2. TAB KEY -> Quick toggle Staff Portal
-  if (keyCode === 9) { // 9 = Tab
+  if (keyCode === 9) {
     let staffModal = document.getElementById("staffPanelContainer");
     if (staffModal) {
       staffModal.remove();
@@ -1206,12 +1256,11 @@ function keyPressed() {
         triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
       }
     }
-    return false; // Prevent tab focus change in browser
+    return false;
   }
 
   // 3. F2 HOTKEYS (F2, Alt+F2, Shift+F2)
   if (keyCode === 113 || key === "F2") {
-    
     // SHIFT + F2 -> Open Dev Role Tester
     if (keyIsDown(SHIFT)) {
       if (userRank === "Dev") {
@@ -1247,9 +1296,8 @@ function keyPressed() {
     }
   }
 
-  // 4. GAMEPLAY SHORTCUTS (Only active while in active match)
+  // 4. GAMEPLAY SHORTCUTS
   if (currentScreen === "screen2") {
-    // 'R' KEY -> Quick Report Player
     if (key === 'r' || key === 'R') {
       triggerNonStaffReportModal();
       return false;
@@ -1480,7 +1528,6 @@ function resetSingleplayerState() {
   dousedPlayers = [];
   curseMarkedTarget = null;
 
-  // ASSIGN EXECUTIONER TARGET TO A SUPPORT ROLE AI BOT
   if (role === 15) {
     let validSupportTargets = [];
     for (let i = 0; i < 3; i++) {
@@ -1793,7 +1840,6 @@ function handleRoleAction(targetNum, cardIndex) {
     return;
   }
 
-  // CHECK IF ACTOR IS CURSED BY MAGIC KILLER (MAGIC KILL TRIGGER)
   if (curseMarkedTarget === 0) { 
     setPersistentAnnouncement("💀 MAGIC CURSE TRIGGERED! You used an ability while cursed and ELIMINATED!");
     handlePlayerDeath();
