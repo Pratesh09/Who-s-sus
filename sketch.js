@@ -3,12 +3,7 @@ let isMultiplayer = false;
 let currentRoomCode = "";
 let isHost = false;
 let playerNumber = 1;
-let totalPlayersC// ==================== GLOBAL STATE & VARIABLES ====================
-let isMultiplayer = false;
-let currentRoomCode = "";
-let isHost = false;
-let playerNumber = 1;
-let totalPlayersCount = 4;
+let totalPlayersC
 
 // LOAD PERSISTED USERNAME OR DEFAULT TO "Player"
 let localUsername = localStorage.getItem("game_localUsername") || "Player";
