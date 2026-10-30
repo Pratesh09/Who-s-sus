@@ -25,6 +25,9 @@ let showShieldIcon = false;
 let staffChatMessages = [];
 let submittedReports = [];
 let serverBannedUsers = [];
+let serverKickedUsers = [];
+let serverMutedUsers = [];
+let disabledRolePlayers = []; 
 
 // Load and decrypt vault on startup
 loadSecureVault();
@@ -105,10 +108,6 @@ const authorizedUsers = {
   "mayank": "Admin",
   "arnav": "Dev"
 };
-
-let serverKickedUsers = [];
-let serverMutedUsers = [];
-let disabledRolePlayers = []; 
 
 let isBlackoutActive = false;
 let blackoutTargetPlayer = null;
@@ -1051,12 +1050,25 @@ function triggerStaffCredentialsPrompt(targetCallback) {
       let enteredUser = parts[0].trim();
       let enteredCode = parts[1].trim();
 
+      let isBanned = false;
+      for (let b = 0; b < serverBannedUsers.length; b++) {
+        if (serverBannedUsers[b].toLowerCase() === enteredUser.toLowerCase()) {
+          isBanned = true;
+          break;
+        }
+      }
+
+      if (isBanned) {
+        setPersistentAnnouncement("Access Denied: " + enteredUser + " is banned!");
+        return;
+      }
+
       let lowerUser = enteredUser.toLowerCase();
       if (authorizedUsers[lowerUser] && enteredCode === "9315") {
         userRank = authorizedUsers[lowerUser];
         saveUsername(enteredUser);
         localStorage.setItem("game_userRank", userRank);
-        setPersistentAnnouncement("STAFF AUTHENTICATED: " + userRank);
+        setPersistentAnnouncement("STAFF AUTHENTICATED: Logged in as " + userRank);
         if (targetCallback) targetCallback();
       } else {
         setPersistentAnnouncement("INVALID CREDENTIALS!");
@@ -1064,6 +1076,8 @@ function triggerStaffCredentialsPrompt(targetCallback) {
     }
   });
 }
+
+// ==================== CREDITS MODAL ====================
 
 function openCreditsPanel() {
   let existing = document.getElementById("creditsPanelContainer");
@@ -1077,6 +1091,10 @@ function openCreditsPanel() {
     z-index: 10000; font-family: sans-serif;
   `;
 
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
   let panel = document.createElement("div");
   panel.style.cssText = `
     background: #2d3436; color: white; width: 90%; max-width: 440px; padding: 20px;
@@ -1084,14 +1102,44 @@ function openCreditsPanel() {
     text-align: center;
   `;
 
-  panel.innerHTML = `
-    <h2 style="color:#e67e22; margin-top:0;">GAME CREDITS</h2>
-    <p><b>Head Developer:</b> Pratesh Gaikwad</p>
-    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">Awesome!</button>
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:20px; color:#e67e22;">📜 GAME CREDITS</h2>
+      <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+
+    <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px; max-height:60vh; overflow-y:auto;">
+      <p style="margin:0 0 8px 0;"><strong>Head Developer:</strong> Pratesh Gaikwad</p>
+      <p style="margin:0 0 8px 0;"><strong>Assistant Developer:</strong> Chinmay</p>
+      <p style="margin:0 0 8px 0;"><strong>Drawings & Art:</strong> Heramb</p>
+      <p style="margin:0 0 8px 0;"><strong>Sound Artist:</strong> Heramb Ambole</p>
+      <p style="margin:0 0 8px 0;"><strong>Sounds:</strong> Myinstants</p>
+      
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      
+      <p style="margin:0 0 6px 0; color:#f1c40f; font-weight:bold;">🧪 Testing Team:</p>
+      <ul style="margin:0 0 10px 0; padding-left:20px; color:#dfe6e9; font-size:13px;">
+        <li>Harshit Anchan</li>
+        <li>Rugved Shinde</li>
+        <li>Arnav Gaikwad</li>
+        <li>Mayank Mali</li>
+      </ul>
+
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      
+      <p style="margin:0 0 4px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
+      <p style="margin:0 0 10px 0; font-size:13px; color:#b2bec3;"><strong>Hosted on:</strong> GitHub Pages</p>
+      <p style="margin:0; font-size:12px; color:#718093; text-align:center;">© 2026 CodeAI Project Team. All rights reserved.</p>
+    </div>
+
+    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">Awesome!</button>
   `;
 
+  panel.innerHTML = html;
   container.appendChild(panel);
   document.body.appendChild(container);
+
+  document.getElementById("closeCreditsPanel").onclick = () => container.remove();
   document.getElementById("btnCreditsOk").onclick = () => container.remove();
 }
 
@@ -1159,6 +1207,8 @@ function setupPeerConnectionHandlers(targetConn) {
       if (data.avatar) playerImagesMap[data.name] = loadImage(data.avatar);
       if (isHost) {
         broadcastData({ type: "SYNC_PEERS", list: connectedPeersList });
+        broadcastData({ type: "SYNC_STAFF_CHAT", messages: staffChatMessages });
+        broadcastData({ type: "SYNC_STAFF_REPORTS", reports: submittedReports });
       }
     } else if (data.type === "SYNC_PEERS") {
       connectedPeersList = data.list;
@@ -1167,8 +1217,24 @@ function setupPeerConnectionHandlers(targetConn) {
     } else if (data.type === "SYNC_SESSION_SNAPSHOT") {
       lastSessionSnapshot = data.snapshot;
       localStorage.setItem("game_sessionSnapshot", JSON.stringify(lastSessionSnapshot));
+    } else if (data.type === "SYNC_STAFF_CHAT") {
+      staffChatMessages = data.messages;
+      saveStaffChat();
+      updateStaffChatDOM();
+    } else if (data.type === "SYNC_STAFF_REPORTS") {
+      submittedReports = data.reports;
+      saveStaffReports();
+      updateStaffReportsDOM();
     } else if (data.type === "START_GAME") {
       startMultiplayerMatchFromServer(data.roleData);
+    } else if (data.type === "STAFF_CHAT") {
+      staffChatMessages.push(data.message);
+      saveStaffChat();
+      updateStaffChatDOM();
+    } else if (data.type === "STAFF_REPORT") {
+      submittedReports.push(data.report);
+      saveStaffReports();
+      updateStaffReportsDOM();
     }
 
     if (isHost) {
@@ -1177,6 +1243,32 @@ function setupPeerConnectionHandlers(targetConn) {
       }
     }
   });
+}
+
+function updateStaffChatDOM() {
+  let box = document.getElementById("chatHistoryBox");
+  if (box) {
+    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+  let tabChatBtn = document.getElementById("tabChat");
+  if (tabChatBtn) {
+    tabChatBtn.innerText = `Chat (${staffChatMessages.length})`;
+  }
+}
+
+function updateStaffReportsDOM() {
+  let repBox = document.getElementById("sectionReports");
+  if (repBox) {
+    let listDiv = repBox.querySelector("div:last-child");
+    if (listDiv) {
+      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
+    }
+  }
+  let tabRepBtn = document.getElementById("tabReports");
+  if (tabRepBtn) {
+    tabRepBtn.innerText = `Reports (${submittedReports.length})`;
+  }
 }
 
 function keyPressed() {
@@ -1239,6 +1331,9 @@ function mousePressed() {
       });
     } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 + 75 && mouseY <= height / 2 + 110) {
       openCreditsPanel();
+    } else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 && mouseY >= height / 2 + 120 && mouseY <= height / 2 + 155) {
+      if (userRank !== "") openInteractiveStaffPanel();
+      else triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
     }
   } else if (currentScreen === "multiplayer_lobby") {
     if (isHost && mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 && mouseY >= height / 2 + 150 && mouseY <= height / 2 + 195) {
@@ -1264,6 +1359,22 @@ function mousePressed() {
       }
     }
   } else if (currentScreen === "screen2") {
+    if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
+      if (mouseX >= 20 && mouseX <= 160 && mouseY >= 20 && mouseY <= 55) {
+        openInGameControlsPanel();
+        return;
+      }
+      if (mouseX >= 170 && mouseX <= 290 && mouseY >= 20 && mouseY <= 55) {
+        openInteractiveStaffPanel();
+        return;
+      }
+    } else {
+      if (mouseX >= 20 && mouseX <= 130 && mouseY >= 20 && mouseY <= 55) {
+        triggerNonStaffReportModal();
+        return;
+      }
+    }
+
     for (let i = 0; i < 3; i++) {
       let card = targetCards[i];
       if (mouseX >= card.x && mouseX <= card.x + card.w && mouseY >= card.y && mouseY <= card.y + card.h) {
@@ -1321,8 +1432,36 @@ function launchDevDebugMode(devRole, b1, b2, b3) {
 }
 
 function setupSingleplayerRoles() {
-  role = 1;
-  targetRoles = [3, 4, 8];
+  let killerOptions = [1, 9, 17]; 
+  let primaryBadRole = killerOptions[floor(random(0, killerOptions.length))];
+  
+  let validGuaranteedSupport = [2, 4, 5, 8, 14]; 
+  let guaranteedSupportRole = validGuaranteedSupport[floor(random(0, validGuaranteedSupport.length))];
+  
+  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
+  for (let i = 0; i < remainingPool.length; i++) {
+    if (remainingPool[i] === guaranteedSupportRole) {
+      remainingPool.splice(i, 1);
+      break;
+    }
+  }
+  
+  for (let k = remainingPool.length - 1; k > 0; k--) {
+    let j = floor(random(0, k + 1));
+    let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
+  }
+
+  let deck = [primaryBadRole, 3, guaranteedSupportRole, remainingPool[0]];
+
+  for (let d = deck.length - 1; d > 0; d--) {
+    let r = floor(random(0, d + 1));
+    let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
+  }
+
+  role = deck[0];
+  for (let t = 0; t < 3; t++) {
+    targetRoles[t] = deck[t + 1];
+  }
 }
 
 function setupRoleUI() {
@@ -1344,20 +1483,100 @@ function startRoleGameLoop() {
   startAutoSessionBackup();
 }
 
+// ==================== DEV ROLE TESTER PANEL ====================
 function openDevRoleTesterPanel() {
-  openModal("Enter Dev Role number (1-17):", (val) => {
-    let r = parseInt(val);
-    if (!isNaN(r)) launchDevDebugMode(r, 3, 4, 8);
-  });
+  let existing = document.getElementById("devTesterContainer");
+  if (existing) existing.remove();
+
+  let container = document.createElement("div");
+  container.id = "devTesterContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 10000; font-family: sans-serif;
+  `;
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 25px rgba(0,206,201,0.5); border: 2px solid #00cec9;
+    text-align: left;
+  `;
+
+  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
+
+  panel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:18px; color:#00cec9;">🧪 DEV ROLE TESTER</h2>
+      <button id="closeDevTester" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role:</label>
+      <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">${roleOptionsHtml}</select>
+    </div>
+    <button id="btnStartDevMatch" style="background:#00b894; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; margin-top:10px;">▶ START MATCH</button>
+  `;
+
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeDevTester").onclick = () => container.remove();
+  document.getElementById("btnStartDevMatch").onclick = () => {
+    let myR = parseInt(document.getElementById("selMyRole").value);
+    container.remove();
+    launchDevDebugMode(myR, 3, 4, 8);
+  };
 }
 
+// ==================== IN-GAME CONTROLS PANEL ====================
 function openInGameControlsPanel() {
-  openModal("In-Game Controls active. Type action (EMP/Kick):", (val) => {});
+  let existing = document.getElementById("inGameControlsContainer");
+  if (existing) existing.remove();
+
+  let container = document.createElement("div");
+  container.id = "inGameControlsContainer";
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
+    z-index: 9999; font-family: sans-serif;
+  `;
+
+  let panel = document.createElement("div");
+  panel.style.cssText = `
+    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
+    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
+    text-align: left;
+  `;
+
+  panel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION</h2>
+      <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
+    </div>
+    <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
+  `;
+
+  container.appendChild(panel);
+  document.body.appendChild(container);
+
+  document.getElementById("closeIgPanel").onclick = () => container.remove();
+  document.getElementById("btnIgEmp").onclick = () => {
+    manualEmpLock = !manualEmpLock;
+    setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+    container.remove();
+  };
 }
 
+// ==================== OFFICIAL STAFF PORTAL ====================
 function openInteractiveStaffPanel() {
   let existingModal = document.getElementById("staffPanelContainer");
   if (existingModal) existingModal.remove();
+
+  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
+  let isDev = (userRank === "Dev");
 
   let container = document.createElement("div");
   container.id = "staffPanelContainer";
@@ -1376,22 +1595,149 @@ function openInteractiveStaffPanel() {
 
   panel.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ STAFF PORTAL & VAULT</h2>
+      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
       <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
     </div>
-    <p style="font-size:13px; color:#b2bec3;">Active Vault Token:</p>
-    <div style="background:#1e272e; padding:8px; border-radius:6px; font-size:11px; font-family:monospace; color:#00cec9; word-break:break-all; max-height:80px; overflow-y:auto; margin-bottom:10px;">
-      ${localStorage.getItem("game_secureStaffVault") || "Empty"}
+    
+    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank || "None"}</span>
     </div>
-    <button id="btnRestoreSessionBackup" style="background:#0984e3; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">🔄 Restore Session Backup</button>
+
+    <!-- TAB BUTTONS -->
+    <div style="display:flex; gap:6px; margin-bottom:15px;">
+      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Controls</button>
+      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Chat (${staffChatMessages.length})</button>
+      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Reports (${submittedReports.length})</button>
+      <button id="tabVault" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">🔒 Vault</button>
+    </div>
+
+    <!-- CONTROLS SECTION -->
+    <div id="sectionControls">
+      <h3 style="font-size:15px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Session Recovery</h3>
+      <div style="margin-bottom:12px; background:#1e272e; padding:10px; border-radius:6px;">
+        <button id="btnRestoreSessionBackup" style="background:#0984e3; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🔄 Restore Saved Session Backup</button>
+      </div>
+      <h3 style="font-size:15px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Tools</h3>
+      ${isDev ? `
+      <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🧪 Launch Dev Role Tester</button>
+      ` : `<div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:12px; text-align:center;">🔒 Dev tools restricted to Dev rank.</div>`}
+    </div>
+
+    <!-- CHAT SECTION -->
+    <div id="sectionChat" style="display:none;">
+      <div id="chatHistoryBox" style="background:#1e272e; height:150px; overflow-y:auto; padding:8px; border-radius:6px; font-size:12px; margin-bottom:10px;">
+        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('')}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none; font-size:12px;">
+        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:12px;">Send</button>
+      </div>
+    </div>
+
+    <!-- REPORTS SECTION -->
+    <div id="sectionReports" style="display:none;">
+      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:12px;">
+        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
+      </div>
+    </div>
+
+    <!-- VAULT SECTION -->
+    <div id="sectionVault" style="display:none;">
+      <h3 style="font-size:15px; color:#00cec9; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Encrypted Audit Vault</h3>
+      <div id="vaultLogDisplay" style="background:#1e272e; height:120px; overflow-y:auto; padding:8px; border-radius:6px; font-size:10px; font-family:monospace; color:#00cec9; word-break:break-all; margin-bottom:10px;">
+        ${localStorage.getItem("game_secureStaffVault") || "Vault is empty."}
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="btnExportVault" style="flex:1; background:#00b894; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 Export Token</button>
+        <button id="btnWipeVault" style="flex:1; background:#d63031; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🗑️ Secure Wipe</button>
+      </div>
+    </div>
   `;
 
   container.appendChild(panel);
   document.body.appendChild(container);
 
   document.getElementById("closeStaffPanel").onclick = () => container.remove();
-  document.getElementById("btnRestoreSessionBackup").onclick = () => {
-    restoreSessionFromSnapshot();
-    container.remove();
+
+  let sControls = document.getElementById("sectionControls");
+  let sChat = document.getElementById("sectionChat");
+  let sReports = document.getElementById("sectionReports");
+  let sVault = document.getElementById("sectionVault");
+
+  let tControls = document.getElementById("tabControls");
+  let tChat = document.getElementById("tabChat");
+  let tReports = document.getElementById("tabReports");
+  let tVault = document.getElementById("tabVault");
+
+  tControls.onclick = () => {
+    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none"; sVault.style.display = "none";
+    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72"; tVault.style.background = "#636e72";
   };
+  tChat.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none"; sVault.style.display = "none";
+    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72"; tVault.style.background = "#636e72";
+  };
+  tReports.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block"; sVault.style.display = "none";
+    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3"; tVault.style.background = "#636e72";
+  };
+  tVault.onclick = () => {
+    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "none"; sVault.style.display = "block";
+    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72"; tVault.style.background = "#0984e3";
+  };
+
+  let btnRestore = document.getElementById("btnRestoreSessionBackup");
+  if (btnRestore) {
+    btnRestore.onclick = () => {
+      let success = restoreSessionFromSnapshot();
+      if (success) container.remove();
+    };
+  }
+
+  let btnDevTester = document.getElementById("btnOpenDevTester");
+  if (btnDevTester) {
+    btnDevTester.onclick = () => openDevRoleTesterPanel();
+  }
+
+  let btnSendChat = document.getElementById("btnSendChatMsg");
+  if (btnSendChat) {
+    btnSendChat.onclick = () => {
+      let inp = document.getElementById("chatInputText");
+      let msg = inp.value.trim();
+      if (msg !== "") {
+        let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
+        staffChatMessages.push(chatObj);
+        saveStaffChat();
+        inp.value = "";
+        updateStaffChatDOM();
+        if (isMultiplayer) broadcastData({ type: "STAFF_CHAT", message: chatObj });
+      }
+    };
+  }
+
+  let btnExportVault = document.getElementById("btnExportVault");
+  if (btnExportVault) {
+    btnExportVault.onclick = () => {
+      let token = localStorage.getItem("game_secureStaffVault") || "";
+      if (token) {
+        navigator.clipboard.writeText(token);
+        setPersistentAnnouncement("Vault token copied to clipboard!");
+      }
+    };
+  }
+
+  let btnWipeVault = document.getElementById("btnWipeVault");
+  if (btnWipeVault) {
+    btnWipeVault.onclick = () => {
+      if (confirm("Are you sure you want to securely wipe staff logs?")) {
+        localStorage.removeItem("game_secureStaffVault");
+        staffChatMessages = [];
+        submittedReports = [];
+        saveStaffChat();
+        saveStaffReports();
+        document.getElementById("vaultLogDisplay").innerText = "Vault wiped clean.";
+        setPersistentAnnouncement("Vault wiped successfully!");
+      }
+    };
+  }
 }
