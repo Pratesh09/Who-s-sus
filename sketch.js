@@ -1077,6 +1077,8 @@ function triggerStaffCredentialsPrompt(targetCallback) {
   });
 }
 
+// ==================== CREDITS MODAL ====================
+
 function openCreditsPanel() {
   let existing = document.getElementById("creditsPanelContainer");
   if (existing) existing.remove();
@@ -1089,6 +1091,10 @@ function openCreditsPanel() {
     z-index: 10000; font-family: sans-serif;
   `;
 
+  container.onclick = (e) => e.stopPropagation();
+  container.onmousedown = (e) => e.stopPropagation();
+  container.ontouchstart = (e) => e.stopPropagation();
+
   let panel = document.createElement("div");
   panel.style.cssText = `
     background: #2d3436; color: white; width: 90%; max-width: 440px; padding: 20px;
@@ -1096,14 +1102,44 @@ function openCreditsPanel() {
     text-align: center;
   `;
 
-  panel.innerHTML = `
-    <h2 style="color:#e67e22; margin-top:0;">GAME CREDITS</h2>
-    <p><b>Head Developer:</b> Pratesh Gaikwad</p>
-    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">Awesome!</button>
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
+      <h2 style="margin:0; font-size:20px; color:#e67e22;">📜 GAME CREDITS</h2>
+      <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    </div>
+
+    <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px; max-height:60vh; overflow-y:auto;">
+      <p style="margin:0 0 8px 0;"><strong>Head Developer:</strong> Pratesh Gaikwad</p>
+      <p style="margin:0 0 8px 0;"><strong>Assistant Developer:</strong> Chinmay</p>
+      <p style="margin:0 0 8px 0;"><strong>Drawings & Art:</strong> Heramb</p>
+      <p style="margin:0 0 8px 0;"><strong>Sound Artist:</strong> Heramb Ambole</p>
+      <p style="margin:0 0 8px 0;"><strong>Sounds:</strong> Myinstants</p>
+      
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      
+      <p style="margin:0 0 6px 0; color:#f1c40f; font-weight:bold;">🧪 Testing Team:</p>
+      <ul style="margin:0 0 10px 0; padding-left:20px; color:#dfe6e9; font-size:13px;">
+        <li>Harshit Anchan</li>
+        <li>Rugved Shinde</li>
+        <li>Arnav Gaikwad</li>
+        <li>Mayank Mali</li>
+      </ul>
+
+      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
+      
+      <p style="margin:0 0 4px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
+      <p style="margin:0 0 10px 0; font-size:13px; color:#b2bec3;"><strong>Hosted on:</strong> GitHub Pages</p>
+      <p style="margin:0; font-size:12px; color:#718093; text-align:center;">© 2026 CodeAI Project Team. All rights reserved.</p>
+    </div>
+
+    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">Awesome!</button>
   `;
 
+  panel.innerHTML = html;
   container.appendChild(panel);
   document.body.appendChild(container);
+
+  document.getElementById("closeCreditsPanel").onclick = () => container.remove();
   document.getElementById("btnCreditsOk").onclick = () => container.remove();
 }
 
@@ -1217,7 +1253,7 @@ function updateStaffChatDOM() {
   }
   let tabChatBtn = document.getElementById("tabChat");
   if (tabChatBtn) {
-    tabChatBtn.innerText = `Staff Chat (${staffChatMessages.length})`;
+    tabChatBtn.innerText = `Chat (${staffChatMessages.length})`;
   }
 }
 
@@ -1295,6 +1331,9 @@ function mousePressed() {
       });
     } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 + 75 && mouseY <= height / 2 + 110) {
       openCreditsPanel();
+    } else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 && mouseY >= height / 2 + 120 && mouseY <= height / 2 + 155) {
+      if (userRank !== "") openInteractiveStaffPanel();
+      else triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
     }
   } else if (currentScreen === "multiplayer_lobby") {
     if (isHost && mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 && mouseY >= height / 2 + 150 && mouseY <= height / 2 + 195) {
@@ -1393,8 +1432,36 @@ function launchDevDebugMode(devRole, b1, b2, b3) {
 }
 
 function setupSingleplayerRoles() {
-  role = 1;
-  targetRoles = [3, 4, 8];
+  let killerOptions = [1, 9, 17]; 
+  let primaryBadRole = killerOptions[floor(random(0, killerOptions.length))];
+  
+  let validGuaranteedSupport = [2, 4, 5, 8, 14]; 
+  let guaranteedSupportRole = validGuaranteedSupport[floor(random(0, validGuaranteedSupport.length))];
+  
+  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
+  for (let i = 0; i < remainingPool.length; i++) {
+    if (remainingPool[i] === guaranteedSupportRole) {
+      remainingPool.splice(i, 1);
+      break;
+    }
+  }
+  
+  for (let k = remainingPool.length - 1; k > 0; k--) {
+    let j = floor(random(0, k + 1));
+    let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
+  }
+
+  let deck = [primaryBadRole, 3, guaranteedSupportRole, remainingPool[0]];
+
+  for (let d = deck.length - 1; d > 0; d--) {
+    let r = floor(random(0, d + 1));
+    let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
+  }
+
+  role = deck[0];
+  for (let t = 0; t < 3; t++) {
+    targetRoles[t] = deck[t + 1];
+  }
 }
 
 function setupRoleUI() {
