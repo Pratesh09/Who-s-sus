@@ -1528,7 +1528,7 @@ function openDevRoleTesterPanel() {
   };
 }
 
-// ==================== IN-GAME CONTROLS PANEL ====================
+// =========// ==================== IN-GAME CONTROLS PANEL ====================
 function openInGameControlsPanel() {
   let existing = document.getElementById("inGameControlsContainer");
   if (existing) existing.remove();
@@ -1543,30 +1543,123 @@ function openInGameControlsPanel() {
 
   let panel = document.createElement("div");
   panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
+    background: #2d3436; color: white; width: 90%; max-width: 480px; padding: 20px;
     border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
-    text-align: left;
+    text-align: left; max-height: 85vh; overflow-y: auto;
   `;
+
+  let botRolesList = targetRoles.map((r, i) => `Player ${i + 2}: ${getRoleName(r)}`).join('<br>');
 
   panel.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
       <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION</h2>
       <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
     </div>
+    
     <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
+      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank || "Dev"}</span>
     </div>
-    <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
+
+    <!-- EMP SWITCH -->
+    <button id="btnIgEmp" style="background:${manualEmpLock ? '#d63031' : '#8e44ad'}; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:10px; font-size:13px;">
+      ⚡ ${manualEmpLock ? 'SHUT DOWN ALL EMP (TURN OFF)' : 'TRIGGER SHUT DOWN ALL EMP SWITCH'}
+    </button>
+
+    <!-- BLACKOUT TRIGGER -->
+    <button id="btnTriggerBlackout" style="background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:10px; font-size:13px;">
+      🌑 Trigger Blackout / Interrogation Freeze
+    </button>
+
+    <!-- VIEW BOT ROLES -->
+    <button id="btnToggleBotRoles" style="background:#00b894; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:10px; font-size:13px;">
+      👁️ View Bot Roles
+    </button>
+    <div id="botRolesDisplay" style="display:none; background:#1e272e; padding:10px; border-radius:6px; font-size:13px; color:#00cec9; margin-bottom:10px;">
+      ${botRolesList}
+    </div>
+
+    <!-- KICK TARGET -->
+    <button id="btnKickPlayer" style="background:#d35400; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:10px; font-size:13px;">
+      👢 Kick Target Player
+    </button>
+
+    <!-- SERVER BAN -->
+    <button id="btnBanPlayer" style="background:#c0392b; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:10px; font-size:13px;">
+      🔨 Server Ban User
+    </button>
+
+    <!-- DISABLE ROLES -->
+    <button id="btnDisableRoles" style="background:#2980b9; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:5px; font-size:13px;">
+      🚫 Disable Specific Role / Player Ability
+    </button>
   `;
 
   container.appendChild(panel);
   document.body.appendChild(container);
 
   document.getElementById("closeIgPanel").onclick = () => container.remove();
+
+  // EMP Toggle
   document.getElementById("btnIgEmp").onclick = () => {
     manualEmpLock = !manualEmpLock;
-    setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
+    setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "SHUTDOWN ACTIVE" : "OFF"));
     container.remove();
+  };
+
+  // Blackout Trigger
+  document.getElementById("btnTriggerBlackout").onclick = () => {
+    openModal("Enter target Player # to blackout (0 for self):", (val) => {
+      let pNum = parseInt(val);
+      if (!isNaN(pNum)) {
+        isBlackoutActive = true;
+        blackoutTargetPlayer = pNum;
+        container.remove();
+        setPersistentAnnouncement("BLACKOUT TRIGGERED FOR PLAYER " + pNum);
+      }
+    });
+  };
+
+  // View Bot Roles Toggle
+  document.getElementById("btnToggleBotRoles").onclick = () => {
+    let disp = document.getElementById("botRolesDisplay");
+    disp.style.display = (disp.style.display === "none") ? "block" : "none";
+  };
+
+  // Kick Player
+  document.getElementById("btnKickPlayer").onclick = () => {
+    openModal("Enter username or Player # to kick:", (val) => {
+      let target = val.trim();
+      if (target !== "") {
+        serverKickedUsers.push(target);
+        setPersistentAnnouncement("Kicked player: " + target);
+        container.remove();
+      }
+    });
+  };
+
+  // Ban Player
+  document.getElementById("btnBanPlayer").onclick = () => {
+    openModal("Enter username or Player # to server ban:", (val) => {
+      let target = val.trim();
+      if (target !== "") {
+        serverBannedUsers.push(target);
+        saveSecureVault();
+        setPersistentAnnouncement("Server Banned player: " + target);
+        container.remove();
+      }
+    });
+  };
+
+  // Disable Role
+  document.getElementById("btnDisableRoles").onclick = () => {
+    openModal("Enter Player # (1-4) whose role/ability to disable:", (val) => {
+      let pIdx = parseInt(val);
+      if (!isNaN(pIdx)) {
+        disabledRolePlayers.push(pIdx);
+        setPersistentAnnouncement("Role disabled for Player " + pIdx);
+        container.remove();
+      }
+    });
   };
 }
 
