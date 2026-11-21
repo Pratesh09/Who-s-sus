@@ -18,8 +18,8 @@ let myProfileImage = null;
 let myProfileImageBase64 = "";
 let playerImagesMap = {};
 
-let isDevModeActive = false; 
-let showShieldIcon = false; 
+let isDevModeActive = false;
+let showShieldIcon = false;
 
 // Encrypted Staff Vault & Logs
 let staffChatMessages = [];
@@ -27,9 +27,8 @@ let submittedReports = [];
 let serverBannedUsers = [];
 let serverKickedUsers = [];
 let serverMutedUsers = [];
-let disabledRolePlayers = []; 
+let disabledRolePlayers = [];
 
-// Load and decrypt vault on startup
 loadSecureVault();
 
 function saveStaffChat() {
@@ -116,41 +115,41 @@ let announcementText = "";
 let announcementHoldTimer = 0;
 
 const roleNames = [
-  "Killer", "Guardian Angel", "Sheriff", "Doctor", 
-  "Detective", "Jester", "Innocent", "Hunter", 
+  "Killer", "Guardian Angel", "Sheriff", "Doctor",
+  "Detective", "Jester", "Innocent", "Hunter",
   "Vampire", "Swapper", "Hacker", "Altruist", "Witch", "Warden",
   "Executioner", "Arsonist", "Magic Killer"
 ];
 
-const KEY_ROLES = [1, 3, 6, 9, 17]; 
-const IMPORTANT_ROLES = [13, 15, 16]; 
-const SUPPORT_ROLES = [2, 4, 5, 7, 8, 10, 11, 12, 14]; 
+const KEY_ROLES = [1, 3, 6, 9, 17];
+const IMPORTANT_ROLES = [13, 15, 16];
+const SUPPORT_ROLES = [2, 4, 5, 7, 8, 10, 11, 12, 14];
 
-let role = 0;         
-let targetRoles = [0, 0, 0]; 
+let role = 0;
+let targetRoles = [0, 0, 0];
 
-let isTargetAlive = [true, true, true]; 
-let isPlayerAlive = true;   
+let isTargetAlive = [true, true, true];
+let isPlayerAlive = true;
 
-let protectedPlayer = null; 
-let currentScreen = "screen0"; 
-let winReason = ""; 
+let protectedPlayer = null;
+let currentScreen = "screen0";
+let winReason = "";
 
-let abilityCooldown = false; 
+let abilityCooldown = false;
 let cooldownTimer = 0;
-let empActive = false; 
-let manualEmpLock = false; 
+let empActive = false;
+let manualEmpLock = false;
 
-let vampireCharges = 0; 
-let stolenRole = null; 
-let lastEliminatedRole = null; 
+let vampireCharges = 0;
+let stolenRole = null;
+let lastEliminatedRole = null;
 
-let altruistSelectedTarget = null; 
-let suspiciousTarget = 1; 
+let altruistSelectedTarget = null;
+let suspiciousTarget = 1;
 
-let curseMarkedTarget = null; 
-let executionerTargetID = null; 
-let dousedPlayers = []; 
+let curseMarkedTarget = null;
+let executionerTargetID = null;
+let dousedPlayers = [];
 
 let custodyTargetID = null;
 let executionTimer = null;
@@ -158,9 +157,9 @@ let executionCountdown = 0;
 let isWardenStripped = false;
 
 let hasAnyPlayerDied = false;
-let revealedKillerID = null; 
-let hunterRevengePending = false; 
-let isSpectating = false; 
+let revealedKillerID = null;
+let hunterRevengePending = false;
+let isSpectating = false;
 
 let statusMessage = "Welcome to Social Deduction!";
 let endSummaryText = "";
@@ -190,12 +189,184 @@ function updateLocalUserRank() {
 }
 
 function getRoleName(roleNum) {
+  if (roleNum < 1 || roleNum > roleNames.length) return "Unknown";
   return roleNames[roleNum - 1];
 }
 
 function setPersistentAnnouncement(msg) {
   announcementText = msg;
   announcementHoldTimer = 5;
+}
+
+// ==================== MULTIPLAYER & ROLE HELPERS ====================
+
+function broadcastData(payload) {
+  if (!isMultiplayer) return;
+  if (conn && conn.open) {
+    conn.send(payload);
+  }
+  for (let c of activePeerConnections) {
+    if (c && c.open) {
+      c.send(payload);
+    }
+  }
+}
+
+function initPeerConnection(asHost, joinCode) {
+  if (typeof Peer === "undefined") {
+    statusMessage = "PeerJS not loaded; running local lobby preview.";
+    return;
+  }
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+
+  let roomId = asHost ? ("rdia-sus-" + Math.random().toString(36).substring(2, 7).toUpperCase()) : null;
+  currentRoomCode = asHost ? roomId.replace("rdia-sus-", "") : joinCode.toUpperCase();
+  peer = asHost ? new Peer(roomId) : new Peer();
+
+  peer.on("open", (id) => {
+    statusMessage = asHost ? ("Room open: " + currentRoomCode) : ("Connected as " + id);
+    if (!asHost && joinCode) {
+      conn = peer.connect("rdia-sus-" + joinCode.toUpperCase());
+      attachConnectionHandlers(conn);
+    }
+  });
+
+  peer.on("connection", (incomingConn) => {
+    activePeerConnections.push(incomingConn);
+    attachConnectionHandlers(incomingConn);
+    incomingConn.on("open", () => {
+      let peerName = (incomingConn.metadata && incomingConn.metadata.username) || ("Operative-" + activePeerConnections.length);
+      connectedPeersList.push(peerName);
+      broadcastData({ type: "LOBBY_SYNC", peers: connectedPeersList, roomCode: currentRoomCode });
+    });
+  });
+
+  peer.on("error", (err) => {
+    statusMessage = "Net notice: " + (err.type || err.message);
+  });
+}
+
+function attachConnectionHandlers(c) {
+  if (!c) return;
+  c.on("data", (data) => {
+    if (!data || !data.type) return;
+    if (data.type === "LOBBY_SYNC") {
+      connectedPeersList = data.peers || connectedPeersList;
+      if (data.roomCode) currentRoomCode = data.roomCode;
+    } else if (data.type === "START_MATCH") {
+      beginMatchSetup();
+    } else if (data.type === "UPDATE_AVATAR" && data.username && data.imgData) {
+      loadImage(data.imgData, (img) => {
+        playerImagesMap[data.username] = img;
+      });
+    } else if (data.type === "STAFF_REPORT" && data.report) {
+      submittedReports.push(data.report);
+      saveStaffReports();
+    } else if (data.type === "SYNC_SESSION_SNAPSHOT" && data.snapshot) {
+      lastSessionSnapshot = data.snapshot;
+      localStorage.setItem("game_sessionSnapshot", JSON.stringify(lastSessionSnapshot));
+    }
+  });
+}
+
+function setupRoleUI() {
+  for (let i = 0; i < targetCards.length; i++) {
+    targetCards[i].borderColor = isTargetAlive[i] ? color(180) : color(231, 76, 60);
+  }
+  if (role === 15 && executionerTargetID === null) {
+    executionerTargetID = floor(random(1, 4));
+  }
+  statusMessage = "Role active: " + getRoleName(role) + ". Inspect targets or trigger actions.";
+}
+
+function beginMatchSetup() {
+  if (!role || role < 1 || role > roleNames.length) {
+    role = floor(random(1, roleNames.length + 1));
+  }
+  isPlayerAlive = true;
+  isSpectating = false;
+  hunterRevengePending = false;
+  custodyTargetID = null;
+  executionTimer = null;
+  executionCountdown = 0;
+  curseMarkedTarget = null;
+  dousedPlayers = [];
+  isTargetAlive = [true, true, true];
+  targetRoles = [
+    floor(random(1, roleNames.length + 1)),
+    floor(random(1, roleNames.length + 1)),
+    floor(random(1, roleNames.length + 1))
+  ];
+  setupRoleUI();
+  currentScreen = "screen2";
+  startAutoSessionBackup();
+  saveSessionSnapshot();
+}
+
+function finishGame(screenKey, summary) {
+  if (sessionSnapshotInterval) {
+    clearInterval(sessionSnapshotInterval);
+    sessionSnapshotInterval = null;
+  }
+  if (executionTimer) {
+    clearInterval(executionTimer);
+    executionTimer = null;
+  }
+  currentScreen = screenKey;
+  endSummaryText = summary;
+}
+
+function checkEndConditions() {
+  let aliveTargets = isTargetAlive.filter(Boolean).length;
+  if (!isPlayerAlive && !isSpectating && !hunterRevengePending) {
+    finishGame("screen3", "You were eliminated before completing your objective.");
+  } else if (aliveTargets === 0) {
+    finishGame("screen5", "All targets resolved. Mission debrief complete.");
+  }
+}
+
+function handleTargetCardClick(idx) {
+  if (!isPlayerAlive || isSpectating) return;
+  if (!isTargetAlive[idx]) {
+    setPersistentAnnouncement(targetCards[idx].label + " is already eliminated.");
+    return;
+  }
+
+  let targetNum = idx + 1;
+  if (role === 17) {
+    curseMarkedTarget = (curseMarkedTarget === targetNum) ? null : targetNum;
+    setPersistentAnnouncement(
+      curseMarkedTarget
+        ? ("Curse marked on " + targetCards[idx].label)
+        : ("Curse cleared from " + targetCards[idx].label)
+    );
+    return;
+  }
+
+  if (role === 14) {
+    custodyTargetID = targetNum;
+    setPersistentAnnouncement(targetCards[idx].label + " placed in custody.");
+    return;
+  }
+
+  if (abilityCooldown) {
+    setPersistentAnnouncement("Ability on cooldown (" + cooldownTimer + "s).");
+    return;
+  }
+
+  if (role === 1 || role === 9 || role === 16 || role === 17) {
+    isTargetAlive[idx] = false;
+    hasAnyPlayerDied = true;
+    lastEliminatedRole = targetRoles[idx];
+    targetCards[idx].borderColor = color(231, 76, 60);
+    setPersistentAnnouncement(targetCards[idx].label + " eliminated (" + getRoleName(targetRoles[idx]) + ").");
+    checkEndConditions();
+  } else {
+    setPersistentAnnouncement("Inspected " + targetCards[idx].label + ": status " + (isTargetAlive[idx] ? "Active" : "Cleared") + ".");
+  }
 }
 
 // ==================== P5.JS SETUP & DRAW ====================
@@ -209,8 +380,8 @@ function setup() {
 
   fileInput = createFileInput(handleImageUpload);
   fileInput.position(20, height - 45);
-  fileInput.style('color', '#ffffff');
-  fileInput.style('font-size', '12px');
+  fileInput.style("color", "#ffffff");
+  fileInput.style("font-size", "12px");
 }
 
 function windowResized() {
@@ -221,7 +392,7 @@ function windowResized() {
 }
 
 function handleImageUpload(file) {
-  if (file.type === 'image') {
+  if (file.type === "image") {
     myProfileImageBase64 = file.data;
     myProfileImage = loadImage(file.data, () => {
       playerImagesMap[localUsername] = myProfileImage;
@@ -242,6 +413,10 @@ function handleImageUpload(file) {
 
 function draw() {
   background(25);
+
+  if (announcementHoldTimer > 0) {
+    announcementHoldTimer = max(0, announcementHoldTimer - deltaTime / 1000);
+  }
 
   if (isBlackoutActive) {
     background(15);
@@ -270,6 +445,153 @@ function draw() {
     drawGameplayScreen();
   } else if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
     drawEndScreen();
+  }
+}
+
+function mousePressed() {
+  if (document.getElementById("creditsPanelContainer")) return;
+
+  if (isBlackoutActive) {
+    if (hitRect(mouseX, mouseY, width / 2 - 210, height - 100, 190, 40)) {
+      isBlackoutActive = false;
+      blackoutTargetPlayer = null;
+    } else if (hitRect(mouseX, mouseY, width / 2 + 20, height - 100, 190, 40)) {
+      isBlackoutActive = false;
+      setPersistentAnnouncement("Target removed from active session.");
+    }
+    return;
+  }
+
+  if (currentScreen === "screen0") {
+    if (hitRect(mouseX, mouseY, width / 2 - 130, height / 2 - 120, 260, 40)) {
+      isMultiplayer = false;
+      isHost = false;
+      role = floor(random(1, roleNames.length + 1));
+      currentScreen = "Role_screen";
+      startShufflePhase();
+    } else if (hitRect(mouseX, mouseY, width / 2 - 130, height / 2 - 70, 260, 40)) {
+      isMultiplayer = true;
+      isHost = true;
+      connectedPeersList = [];
+      currentScreen = "multiplayer_lobby";
+      initPeerConnection(true, "");
+    } else if (hitRect(mouseX, mouseY, width / 2 - 130, height / 2 - 20, 260, 40)) {
+      openModal("Enter Room Code:", (codeVal) => {
+        let code = codeVal.trim().toUpperCase();
+        if (!code) return;
+        isMultiplayer = true;
+        isHost = false;
+        currentScreen = "multiplayer_lobby";
+        initPeerConnection(false, code);
+      });
+    } else if (hitRect(mouseX, mouseY, width / 2 - 130, height / 2 + 30, 260, 38)) {
+      openModal("Enter display username:", (nameVal) => {
+        let cleanName = nameVal.trim();
+        if (cleanName) saveUsername(cleanName);
+      });
+    } else if (hitRect(mouseX, mouseY, width / 2 - 130, height / 2 + 75, 260, 35)) {
+      openCreditsPanel();
+    } else if (hitRect(mouseX, mouseY, width / 2 - 80, height / 2 + 120, 160, 35)) {
+      triggerStaffCredentialsPrompt(() => {
+        setPersistentAnnouncement("Staff access ready. Vault records: " + submittedReports.length);
+      });
+    }
+    return;
+  }
+
+  if (currentScreen === "multiplayer_lobby") {
+    if (isHost && hitRect(mouseX, mouseY, width / 2 - 110, height / 2 + 150, 220, 45)) {
+      role = floor(random(1, roleNames.length + 1));
+      broadcastData({ type: "START_MATCH" });
+      currentScreen = "Role_screen";
+      startShufflePhase();
+    } else if (hitRect(mouseX, mouseY, width / 2 - 90, height / 2 + 210, 180, 38)) {
+      currentScreen = "screen0";
+    }
+    return;
+  }
+
+  if (currentScreen === "Role_screen" && !isShuffling && !hasSelectedCard) {
+    for (let i = 0; i < shuffleCards.length; i++) {
+      let c = shuffleCards[i];
+      if (hitRect(mouseX, mouseY, c.x, c.y, c.w, c.h)) {
+        hasSelectedCard = true;
+        selectedCardIndex = i;
+        if (autoStartTimeout) clearTimeout(autoStartTimeout);
+        autoStartTimeout = setTimeout(() => {
+          if (currentScreen === "Role_screen") beginMatchSetup();
+        }, 1200);
+        break;
+      }
+    }
+    return;
+  }
+
+  if (currentScreen === "screen2") {
+    if (userRank !== "" && dist(mouseX, mouseY, shieldClickX, shieldClickY) <= shieldClickRadius) {
+      showShieldIcon = !showShieldIcon;
+      return;
+    }
+
+    if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
+      if (hitRect(mouseX, mouseY, 20, 20, 140, 35)) {
+        isDevModeActive = !isDevModeActive;
+        setPersistentAnnouncement(isDevModeActive ? "Inspector overlay enabled." : "Inspector overlay hidden.");
+        return;
+      }
+      if (hitRect(mouseX, mouseY, 170, 20, 120, 35)) {
+        setPersistentAnnouncement("Vault logs: " + submittedReports.length + " reports | " + staffChatMessages.length + " notes.");
+        return;
+      }
+    } else if (hitRect(mouseX, mouseY, 20, 20, 110, 35)) {
+      triggerNonStaffReportModal();
+      return;
+    }
+
+    if (role === 14 && custodyTargetID !== null) {
+      if (hitRect(mouseX, mouseY, width / 2 - 205, height - 130, 190, 38)) {
+        setPersistentAnnouncement("Player " + (custodyTargetID + 1) + " pardoned.");
+        custodyTargetID = null;
+        return;
+      }
+      if (hitRect(mouseX, mouseY, width / 2 + 15, height - 130, 190, 38)) {
+        let idx = custodyTargetID - 1;
+        if (idx >= 0 && idx < 3) {
+          isTargetAlive[idx] = false;
+          targetCards[idx].borderColor = color(231, 76, 60);
+        }
+        setPersistentAnnouncement("Player " + (custodyTargetID + 1) + " executed.");
+        custodyTargetID = null;
+        checkEndConditions();
+        return;
+      }
+    }
+
+    if (hunterRevengePending && hitRect(mouseX, mouseY, width / 2 - 110, height - 85, 220, 45)) {
+      hunterRevengePending = false;
+      isSpectating = true;
+      return;
+    }
+
+    if (!isPlayerAlive && hitRect(mouseX, mouseY, width / 2 - 90, height - 85, 180, 45)) {
+      isSpectating = !isSpectating;
+      return;
+    }
+
+    for (let i = 0; i < targetCards.length; i++) {
+      let c = targetCards[i];
+      if (hitRect(mouseX, mouseY, c.x, c.y, c.w, c.h)) {
+        handleTargetCardClick(i);
+        break;
+      }
+    }
+    return;
+  }
+
+  if (["screen3", "screen4", "screen5", "screen6", "screen8"].includes(currentScreen)) {
+    if (hitRect(mouseX, mouseY, width / 2 - 100, height - 100, 200, 45)) {
+      currentScreen = "screen0";
+    }
   }
 }
 
@@ -366,7 +688,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
   translate(x, y);
 
   let cHex = getRoleColorHex(roleId);
-  
+
   stroke(255, 255, 255, 220);
   strokeWeight(3);
   fill(color(cHex));
@@ -398,8 +720,7 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     rect(-sz * 0.2, 0.1 * sz, sz * 0.4, sz * 0.08, 2);
     rect(-sz * 0.08, 0.18 * sz, sz * 0.16, sz * 0.2, 2);
     pop();
-  } 
-  else if (roleId === 2) {
+  } else if (roleId === 2) {
     fill(255, 215, 0);
     arc(-sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, HALF_PI, PI + HALF_PI);
     arc(sz * 0.3, -sz * 0.1, sz * 0.4, sz * 0.5, PI + HALF_PI, HALF_PI);
@@ -412,30 +733,26 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     vertex(-sz * 0.2, sz * 0.2);
     vertex(-sz * 0.25, -sz * 0.2);
     endShape(CLOSE);
-  }
-  else if (roleId === 3) {
+  } else if (roleId === 3) {
     fill(255, 223, 0);
     push();
     drawStarVector(0, 0, sz * 0.2, sz * 0.45, 6);
     pop();
-  }
-  else if (roleId === 4) {
+  } else if (roleId === 4) {
     fill(255);
     rect(-sz * 0.1, -sz * 0.35, sz * 0.2, sz * 0.7, 3);
     rect(-sz * 0.35, -sz * 0.1, sz * 0.7, sz * 0.2, 3);
     stroke(46, 204, 113);
     strokeWeight(2);
     line(-sz * 0.2, sz * 0.2, sz * 0.2, -sz * 0.2);
-  }
-  else if (roleId === 5) {
+  } else if (roleId === 5) {
     stroke(255);
     strokeWeight(3);
     noFill();
     ellipse(-sz * 0.18, -sz * 0.05, sz * 0.3, sz * 0.3);
     ellipse(sz * 0.18, sz * 0.1, sz * 0.3, sz * 0.3);
     line(-sz * 0.05, -sz * 0.05, sz * 0.05, sz * 0.1);
-  }
-  else if (roleId === 6) {
+  } else if (roleId === 6) {
     fill(255);
     beginShape();
     vertex(-sz * 0.35, -sz * 0.1);
@@ -446,16 +763,14 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     vertex(0, -sz * 0.35);
     vertex(-sz * 0.15, 0);
     endShape(CLOSE);
-  }
-  else if (roleId === 11) {
+  } else if (roleId === 11) {
     fill(255);
     rect(-sz * 0.3, -sz * 0.25, sz * 0.6, sz * 0.38, 4);
     fill(30);
     rect(-sz * 0.25, -sz * 0.21, sz * 0.5, sz * 0.3);
     fill(255);
     rect(-sz * 0.38, sz * 0.15, sz * 0.76, sz * 0.1, 3);
-  }
-  else if (roleId === 12) {
+  } else if (roleId === 12) {
     stroke(231, 76, 60);
     strokeWeight(3);
     noFill();
@@ -464,18 +779,15 @@ function drawVectorRoleBadge(x, y, sz, roleId, labelText) {
     fill(241, 196, 15);
     triangle(0, -sz * 0.45, -sz * 0.1, -sz * 0.1, sz * 0.1, -sz * 0.1);
     rect(-sz * 0.03, -sz * 0.1, sz * 0.06, sz * 0.5);
-  }
-  else if (roleId === 10) {
+  } else if (roleId === 10) {
     stroke(255);
     strokeWeight(3);
     noFill();
     arc(-sz * 0.05, 0, sz * 0.4, sz * 0.4, -HALF_PI, HALF_PI);
     arc(sz * 0.05, 0, sz * 0.4, sz * 0.4, HALF_PI, PI + HALF_PI);
-  }
-  else if (roleId === 17) {
+  } else if (roleId === 17) {
     drawVectorSpade(0, 0, sz * 0.8, color(155, 89, 182));
-  }
-  else {
+  } else {
     fill(255);
     ellipse(0, 0, sz * 0.4, sz * 0.4);
   }
@@ -521,9 +833,9 @@ function drawBlackoutBadge(x, y, scaleFactor) {
   stroke(241, 196, 15);
   strokeWeight(3);
   noFill();
-  ellipse(0, -25, 34, 34); 
-  rect(-8, -8, 16, 12);   
-  stroke(231, 76, 60); 
+  ellipse(0, -25, 34, 34);
+  rect(-8, -8, 16, 12);
+  stroke(231, 76, 60);
   strokeWeight(3);
   line(-12, -35, 12, -15);
   line(-5, -15, 8, -5);
@@ -630,7 +942,7 @@ function drawMultiplayerLobbyScreen() {
     stroke(100);
     rect(width / 2 - 150, height / 2 + (i * 35) - 5, 300, 30, 6);
     noStroke();
-    
+
     fill(i < playersList.length ? color(255) : color(120));
     textSize(14);
     text(i < playersList.length ? playersList[i] : "Waiting for player...", width / 2, height / 2 + (i * 35) + 10);
@@ -684,12 +996,12 @@ function drawRoleRevealScreen() {
     for (let i = 0; i < 3; i++) {
       let card = shuffleCards[i];
       let offsetX = sin(shuffleTimer * 3 + i) * 35;
-      
+
       stroke(0, 184, 148);
       strokeWeight(3);
       fill(45, 52, 54);
       rect(card.x + offsetX, card.y, card.w, card.h, 10);
-      
+
       stroke(0, 184, 148, 120);
       strokeWeight(1.5);
       line(card.x + offsetX + 10, card.y + 10, card.x + offsetX + card.w - 10, card.y + card.h - 10);
@@ -735,7 +1047,7 @@ function drawRoleRevealScreen() {
         textSize(16);
         textStyle(BOLD);
         text(getRoleName(role), card.x + card.w / 2, card.y + card.h / 2 - 12);
-        
+
         drawVectorRoleBadge(card.x + card.w / 2, card.y + card.h / 2 + 25, 22, role);
       } else {
         stroke(100);
@@ -761,7 +1073,7 @@ function drawGameplayScreen() {
   fill(255);
   textSize(26);
   textStyle(BOLD);
-  
+
   let roleText = "Your Role: " + getRoleName(role);
   text(roleText, width / 2, 35);
 
@@ -773,9 +1085,9 @@ function drawGameplayScreen() {
 
   if (userRank !== "") {
     let shieldColor;
-    if (userRank === "Dev") shieldColor = color(52, 152, 219);       
-    else if (userRank === "Admin") shieldColor = color(155, 89, 182); 
-    else shieldColor = color(46, 204, 113);                         
+    if (userRank === "Dev") shieldColor = color(52, 152, 219);
+    else if (userRank === "Admin") shieldColor = color(155, 89, 182);
+    else shieldColor = color(46, 204, 113);
 
     shieldClickX = (width / 2 - 12) + (textW / 2) + 16;
     shieldClickY = 65;
@@ -800,10 +1112,10 @@ function drawGameplayScreen() {
   let statusY = showEmpBadgeCheck ? 170 : 110;
 
   if (announcementHoldTimer > 0) {
-    fill(241, 196, 15); 
+    fill(241, 196, 15);
     textSize(18);
     textStyle(BOLD);
-    text("📢 " + announcementText, width / 2, statusY);
+    text(announcementText, width / 2, statusY);
   } else {
     fill(220);
     textSize(18);
@@ -814,7 +1126,7 @@ function drawGameplayScreen() {
   for (let i = 0; i < 3; i++) {
     let card = targetCards[i];
     let isAlive = isTargetAlive[i];
-    let targetNum = i + 1; 
+    let targetNum = i + 1;
 
     let isExecutionerTarget = (role === 15 && executionerTargetID === targetNum);
     let targetUsername = connectedPeersList[i] || ("Player " + (i + 2));
@@ -843,7 +1155,7 @@ function drawGameplayScreen() {
     textSize(14);
     fill(isAlive ? color(46, 204, 113) : color(231, 76, 60));
     text(isAlive ? "ALIVE" : "ELIMINATED", card.x + card.w / 2, card.y + 70);
-    
+
     if (role === 17 && isAlive && !abilityCooldown) {
       let isCursed = (curseMarkedTarget === targetNum);
       fill(isCursed ? color(142, 68, 173) : color(60, 40, 75));
@@ -857,7 +1169,7 @@ function drawGameplayScreen() {
       fill(155, 89, 182);
       textSize(13);
       textStyle(BOLD);
-      text("🎯 YOUR TARGET", card.x + card.w / 2, card.y + 115);
+      text("YOUR TARGET", card.x + card.w / 2, card.y + 115);
     }
 
     if (custodyTargetID === (i + 1)) {
@@ -865,9 +1177,9 @@ function drawGameplayScreen() {
       textSize(12);
       textStyle(BOLD);
       if (executionTimer !== null) {
-        text("⚡ EXECUTING (" + executionCountdown + "s)", card.x + card.w / 2, card.y + 110);
+        text("EXECUTING (" + executionCountdown + "s)", card.x + card.w / 2, card.y + 110);
       } else {
-        text("🔒 IN CUSTODY", card.x + card.w / 2, card.y + 110);
+        text("IN CUSTODY", card.x + card.w / 2, card.y + 110);
       }
     }
 
@@ -878,7 +1190,7 @@ function drawGameplayScreen() {
 
   if (role === 14 && custodyTargetID !== null) {
     drawButton(width / 2 - 205, height - 130, 190, 38, "Pardon Player", color(46, 204, 113));
-    drawButton(width / 2 + 15, height - 130, 190, 38, "⚡ Execute Player", color(231, 76, 60));
+    drawButton(width / 2 + 15, height - 130, 190, 38, "Execute Player", color(231, 76, 60));
   }
 
   if (hunterRevengePending) {
@@ -891,7 +1203,7 @@ function drawGameplayScreen() {
     drawButton(20, 20, 140, 35, "In-Game Controls", color(108, 122, 137));
     drawButton(170, 20, 120, 35, "Staff Portal", color(41, 128, 185));
   } else {
-    drawButton(20, 20, 110, 35, "🚩 Report", color(231, 76, 60));
+    drawButton(20, 20, 110, 35, "Report", color(231, 76, 60));
   }
 }
 
@@ -945,6 +1257,10 @@ function drawButton(x, y, w, h, label, btnColor) {
   textSize(15);
   textStyle(BOLD);
   text(label, x + w / 2, y + h / 2);
+}
+
+function hitRect(px, py, x, y, w, h) {
+  return px >= x && px <= x + w && py >= y && py <= y + h;
 }
 
 function setupTargetCardBounds() {
@@ -1091,7 +1407,9 @@ function openCreditsPanel() {
     z-index: 10000; font-family: sans-serif;
   `;
 
-  container.onclick = (e) => e.stopPropagation();
+  container.onclick = (e) => {
+    if (e.target === container) container.remove();
+  };
   container.onmousedown = (e) => e.stopPropagation();
   container.ontouchstart = (e) => e.stopPropagation();
 
@@ -1102,642 +1420,22 @@ function openCreditsPanel() {
     text-align: center;
   `;
 
-  let html = `
+  panel.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#e67e22;">📜 GAME CREDITS</h2>
-      <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+      <h2 style="margin:0; font-size:20px; color:#e67e22;">GAME CREDITS</h2>
+      <button id="closeCreditsPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">Close</button>
     </div>
 
     <div style="font-size:14px; color:#dfe6e9; line-height:1.6; text-align:left; background:#1e272e; padding:15px; border-radius:8px; max-height:60vh; overflow-y:auto;">
       <p style="margin:0 0 8px 0;"><strong>Head Developer:</strong> Pratesh Gaikwad</p>
       <p style="margin:0 0 8px 0;"><strong>Assistant Developer:</strong> Chinmay</p>
       <p style="margin:0 0 8px 0;"><strong>Drawings & Art:</strong> Heramb</p>
-      <p style="margin:0 0 8px 0;"><strong>Sound Artist:</strong> Heramb Ambole</p>
-      <p style="margin:0 0 8px 0;"><strong>Sounds:</strong> Myinstants</p>
-      
-      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
-      
-      <p style="margin:0 0 6px 0; color:#f1c40f; font-weight:bold;">🧪 Testing Team:</p>
-      <ul style="margin:0 0 10px 0; padding-left:20px; color:#dfe6e9; font-size:13px;">
-        <li>Harshit Anchan</li>
-        <li>Rugved Shinde</li>
-        <li>Arnav Gaikwad</li>
-        <li>Mayank Mali</li>
-      </ul>
-
-      <hr style="border:0; border-top:1px solid #636e72; margin:10px 0;">
-      
-      <p style="margin:0 0 4px 0; font-size:13px; color:#b2bec3;"><strong>Made with:</strong> CodeAI & p5.js</p>
-      <p style="margin:0 0 10px 0; font-size:13px; color:#b2bec3;"><strong>Hosted on:</strong> GitHub Pages</p>
-      <p style="margin:0; font-size:12px; color:#718093; text-align:center;">© 2026 CodeAI Project Team. All rights reserved.</p>
+      <p style="margin:0;"><strong>Organization:</strong> RDIA / ISF</p>
     </div>
-
-    <button id="btnCreditsOk" style="margin-top:15px; background:#e67e22; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:15px;">Awesome!</button>
   `;
 
-  panel.innerHTML = html;
   container.appendChild(panel);
   document.body.appendChild(container);
 
   document.getElementById("closeCreditsPanel").onclick = () => container.remove();
-  document.getElementById("btnCreditsOk").onclick = () => container.remove();
-}
-
-function createMultiplayerRoom() {
-  currentRoomCode = "ROOM-" + floor(random(1000, 9999));
-  
-  if (typeof Peer === "undefined") {
-    statusMessage = "Error: PeerJS library not loaded!";
-    return;
-  }
-
-  peer = new Peer(currentRoomCode, { host: '0.peerjs.com', port: 443, secure: true, debug: 2 });
-
-  peer.on('open', (id) => {
-    isMultiplayer = true;
-    isHost = true;
-    connectedPeersList = [];
-    activePeerConnections = [];
-    currentScreen = "multiplayer_lobby";
-    statusMessage = "Room created successfully!";
-  });
-
-  peer.on('connection', (incomingConn) => {
-    activePeerConnections.push(incomingConn);
-    setupPeerConnectionHandlers(incomingConn);
-  });
-}
-
-function joinMultiplayerRoom(code) {
-  statusMessage = "Connecting to " + code + "...";
-  currentScreen = "multiplayer_lobby";
-  isMultiplayer = true;
-  isHost = false;
-  currentRoomCode = code;
-  tryConnectPeer(code, 3);
-}
-
-function tryConnectPeer(code, retriesLeft) {
-  peer = new Peer({ host: '0.peerjs.com', port: 443, secure: true, debug: 2 });
-
-  peer.on('open', () => {
-    conn = peer.connect(code, { reliable: true });
-    conn.on('open', () => {
-      statusMessage = "Connected to room: " + code;
-      setupPeerConnectionHandlers(conn);
-      conn.send({ type: "JOIN", name: localUsername, avatar: myProfileImageBase64 });
-    });
-  });
-}
-
-function broadcastData(data) {
-  if (isHost) {
-    for (let c of activePeerConnections) {
-      if (c && c.open) c.send(data);
-    }
-  } else if (conn && conn.open) {
-    conn.send(data);
-  }
-}
-
-function setupPeerConnectionHandlers(targetConn) {
-  targetConn.on('data', (data) => {
-    if (data.type === "JOIN") {
-      if (!connectedPeersList.includes(data.name)) connectedPeersList.push(data.name);
-      if (data.avatar) playerImagesMap[data.name] = loadImage(data.avatar);
-      if (isHost) {
-        broadcastData({ type: "SYNC_PEERS", list: connectedPeersList });
-        broadcastData({ type: "SYNC_STAFF_CHAT", messages: staffChatMessages });
-        broadcastData({ type: "SYNC_STAFF_REPORTS", reports: submittedReports });
-      }
-    } else if (data.type === "SYNC_PEERS") {
-      connectedPeersList = data.list;
-    } else if (data.type === "UPDATE_AVATAR") {
-      playerImagesMap[data.username] = loadImage(data.imgData);
-    } else if (data.type === "SYNC_SESSION_SNAPSHOT") {
-      lastSessionSnapshot = data.snapshot;
-      localStorage.setItem("game_sessionSnapshot", JSON.stringify(lastSessionSnapshot));
-    } else if (data.type === "SYNC_STAFF_CHAT") {
-      staffChatMessages = data.messages;
-      saveStaffChat();
-      updateStaffChatDOM();
-    } else if (data.type === "SYNC_STAFF_REPORTS") {
-      submittedReports = data.reports;
-      saveStaffReports();
-      updateStaffReportsDOM();
-    } else if (data.type === "START_GAME") {
-      startMultiplayerMatchFromServer(data.roleData);
-    } else if (data.type === "STAFF_CHAT") {
-      staffChatMessages.push(data.message);
-      saveStaffChat();
-      updateStaffChatDOM();
-    } else if (data.type === "STAFF_REPORT") {
-      submittedReports.push(data.report);
-      saveStaffReports();
-      updateStaffReportsDOM();
-    }
-
-    if (isHost) {
-      for (let c of activePeerConnections) {
-        if (c !== targetConn && c.open) c.send(data);
-      }
-    }
-  });
-}
-
-function updateStaffChatDOM() {
-  let box = document.getElementById("chatHistoryBox");
-  if (box) {
-    box.innerHTML = staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('');
-    box.scrollTop = box.scrollHeight;
-  }
-  let tabChatBtn = document.getElementById("tabChat");
-  if (tabChatBtn) {
-    tabChatBtn.innerText = `Chat (${staffChatMessages.length})`;
-  }
-}
-
-function updateStaffReportsDOM() {
-  let repBox = document.getElementById("sectionReports");
-  if (repBox) {
-    let listDiv = repBox.querySelector("div:last-child");
-    if (listDiv) {
-      listDiv.innerHTML = submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('');
-    }
-  }
-  let tabRepBtn = document.getElementById("tabReports");
-  if (tabRepBtn) {
-    tabRepBtn.innerText = `Reports (${submittedReports.length})`;
-  }
-}
-
-function keyPressed() {
-  if (keyCode === 27) {
-    ["staffPanelContainer", "inGameControlsContainer", "devTesterContainer", "creditsPanelContainer", "witchGuessContainer"].forEach(id => {
-      let el = document.getElementById(id);
-      if (el) el.remove();
-    });
-    return false;
-  }
-
-  if (keyCode === 9) {
-    let staffModal = document.getElementById("staffPanelContainer");
-    if (staffModal) staffModal.remove();
-    else {
-      if (userRank !== "") openInteractiveStaffPanel();
-      else triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
-    }
-    return false;
-  }
-
-  if (keyCode === 113 || key === "F2") {
-    if (keyIsDown(SHIFT)) {
-      if (userRank === "Dev") openDevRoleTesterPanel();
-      else triggerStaffCredentialsPrompt(() => openDevRoleTesterPanel());
-      return false;
-    }
-    if (keyIsDown(ALT)) {
-      if (currentScreen === "screen2") {
-        if (userRank !== "") openInGameControlsPanel();
-        else triggerStaffCredentialsPrompt(() => openInGameControlsPanel());
-      }
-      return false;
-    } else {
-      if (userRank !== "") openInteractiveStaffPanel();
-      else triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
-      return false;
-    }
-  }
-}
-
-function mousePressed() {
-  if (document.getElementById("staffPanelContainer") || document.getElementById("inGameControlsContainer") || document.getElementById("devTesterContainer") || document.getElementById("creditsPanelContainer") || document.getElementById("witchGuessContainer")) {
-    return;
-  }
-
-  if (currentScreen === "screen0") {
-    if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 - 120 && mouseY <= height / 2 - 80) {
-      startSingleplayer();
-    } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 - 70 && mouseY <= height / 2 - 30) {
-      createMultiplayerRoom();
-    } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 - 20 && mouseY <= height / 2 + 20) {
-      openModal("Enter Room Code to Join:", (val) => {
-        let code = val.trim().toUpperCase();
-        if (code !== "") joinMultiplayerRoom(code);
-      });
-    } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 + 30 && mouseY <= height / 2 + 68) {
-      openModal("Enter your desired username:", (val) => {
-        if (val.trim() !== "") saveUsername(val.trim());
-      });
-    } else if (mouseX >= width / 2 - 130 && mouseX <= width / 2 + 130 && mouseY >= height / 2 + 75 && mouseY <= height / 2 + 110) {
-      openCreditsPanel();
-    } else if (mouseX >= width / 2 - 80 && mouseX <= width / 2 + 80 && mouseY >= height / 2 + 120 && mouseY <= height / 2 + 155) {
-      if (userRank !== "") openInteractiveStaffPanel();
-      else triggerStaffCredentialsPrompt(() => openInteractiveStaffPanel());
-    }
-  } else if (currentScreen === "multiplayer_lobby") {
-    if (isHost && mouseX >= width / 2 - 110 && mouseX <= width / 2 + 110 && mouseY >= height / 2 + 150 && mouseY <= height / 2 + 195) {
-      startMultiplayerGame();
-    } else if (mouseX >= width / 2 - 90 && mouseX <= width / 2 + 90 && mouseY >= height / 2 + 210 && mouseY <= height / 2 + 248) {
-      if (peer) peer.destroy();
-      isMultiplayer = false;
-      currentScreen = "screen0";
-    }
-  } else if (currentScreen === "Role_screen") {
-    if (!isShuffling && !hasSelectedCard) {
-      for (let i = 0; i < 3; i++) {
-        let card = shuffleCards[i];
-        if (mouseX >= card.x && mouseX <= card.x + card.w && mouseY >= card.y && mouseY <= card.y + card.h) {
-          hasSelectedCard = true;
-          selectedCardIndex = i;
-          autoStartTimeout = setTimeout(() => {
-            currentScreen = "screen2";
-            startRoleGameLoop();
-          }, 2500);
-          break;
-        }
-      }
-    }
-  } else if (currentScreen === "screen2") {
-    if (userRank === "Dev" || userRank === "Admin" || userRank === "Moderator") {
-      if (mouseX >= 20 && mouseX <= 160 && mouseY >= 20 && mouseY <= 55) {
-        openInGameControlsPanel();
-        return;
-      }
-      if (mouseX >= 170 && mouseX <= 290 && mouseY >= 20 && mouseY <= 55) {
-        openInteractiveStaffPanel();
-        return;
-      }
-    } else {
-      if (mouseX >= 20 && mouseX <= 130 && mouseY >= 20 && mouseY <= 55) {
-        triggerNonStaffReportModal();
-        return;
-      }
-    }
-
-    for (let i = 0; i < 3; i++) {
-      let card = targetCards[i];
-      if (mouseX >= card.x && mouseX <= card.x + card.w && mouseY >= card.y && mouseY <= card.y + card.h) {
-        handleRoleAction(i + 1, i);
-      }
-    }
-  }
-}
-
-function touchStarted() {
-  mousePressed();
-  return false;
-}
-
-function startMultiplayerGame() {
-  setupSingleplayerRoles();
-  broadcastData({
-    type: "START_GAME",
-    roleData: { role: targetRoles[0], targets: [role, targetRoles[1], targetRoles[2]] }
-  });
-  setupRoleUI();
-  currentScreen = "Role_screen";
-  startShufflePhase();
-}
-
-function startMultiplayerMatchFromServer(data) {
-  role = data.role;
-  targetRoles = data.targets;
-  setupRoleUI();
-  currentScreen = "Role_screen";
-  startShufflePhase();
-}
-
-function resetSingleplayerState() {
-  isMultiplayer = false;
-  isPlayerAlive = true;
-  isTargetAlive = [true, true, true];
-}
-
-function startSingleplayer() {
-  setupSingleplayerRoles();
-  resetSingleplayerState();
-  setupRoleUI();
-  currentScreen = "Role_screen";
-  startShufflePhase();
-}
-
-function launchDevDebugMode(devRole, b1, b2, b3) {
-  role = devRole;
-  targetRoles = [b1, b2, b3];
-  resetSingleplayerState();
-  setupRoleUI();
-  currentScreen = "screen2";
-  startRoleGameLoop();
-}
-
-function setupSingleplayerRoles() {
-  let killerOptions = [1, 9, 17]; 
-  let primaryBadRole = killerOptions[floor(random(0, killerOptions.length))];
-  
-  let validGuaranteedSupport = [2, 4, 5, 8, 14]; 
-  let guaranteedSupportRole = validGuaranteedSupport[floor(random(0, validGuaranteedSupport.length))];
-  
-  let remainingPool = [2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
-  for (let i = 0; i < remainingPool.length; i++) {
-    if (remainingPool[i] === guaranteedSupportRole) {
-      remainingPool.splice(i, 1);
-      break;
-    }
-  }
-  
-  for (let k = remainingPool.length - 1; k > 0; k--) {
-    let j = floor(random(0, k + 1));
-    let temp = remainingPool[k]; remainingPool[k] = remainingPool[j]; remainingPool[j] = temp;
-  }
-
-  let deck = [primaryBadRole, 3, guaranteedSupportRole, remainingPool[0]];
-
-  for (let d = deck.length - 1; d > 0; d--) {
-    let r = floor(random(0, d + 1));
-    let tempDeck = deck[d]; deck[d] = deck[r]; deck[r] = tempDeck;
-  }
-
-  role = deck[0];
-  for (let t = 0; t < 3; t++) {
-    targetRoles[t] = deck[t + 1];
-  }
-}
-
-function setupRoleUI() {
-  for (let i = 0; i < 3; i++) {
-    targetCards[i].borderColor = color(180);
-  }
-  statusMessage = "Role assigned: " + getRoleName(role);
-}
-
-function handleRoleAction(targetNum, cardIndex) {
-  if (!isPlayerAlive) return;
-  targetCards[cardIndex].borderColor = color(231, 76, 60);
-  isTargetAlive[cardIndex] = false;
-  setPersistentAnnouncement("Eliminated Player " + (targetNum + 1));
-}
-
-function startRoleGameLoop() {
-  if (gameLoopInterval) clearInterval(gameLoopInterval);
-  startAutoSessionBackup();
-}
-
-// ==================== DEV ROLE TESTER PANEL ====================
-function openDevRoleTesterPanel() {
-  let existing = document.getElementById("devTesterContainer");
-  if (existing) existing.remove();
-
-  let container = document.createElement("div");
-  container.id = "devTesterContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 10000; font-family: sans-serif;
-  `;
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 420px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 25px rgba(0,206,201,0.5); border: 2px solid #00cec9;
-    text-align: left;
-  `;
-
-  let roleOptionsHtml = roleNames.map((rName, idx) => `<option value="${idx + 1}">${idx + 1}. ${rName}</option>`).join('');
-
-  panel.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:18px; color:#00cec9;">🧪 DEV ROLE TESTER</h2>
-      <button id="closeDevTester" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    <div style="margin-bottom:10px;">
-      <label style="display:block; font-size:13px; margin-bottom:4px; color:#74b9ff; font-weight:bold;">Your Role:</label>
-      <select id="selMyRole" style="width:100%; padding:8px; border-radius:6px; background:#1e272e; color:white; border:1px solid #636e72;">${roleOptionsHtml}</select>
-    </div>
-    <button id="btnStartDevMatch" style="background:#00b894; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; margin-top:10px;">▶ START MATCH</button>
-  `;
-
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeDevTester").onclick = () => container.remove();
-  document.getElementById("btnStartDevMatch").onclick = () => {
-    let myR = parseInt(document.getElementById("selMyRole").value);
-    container.remove();
-    launchDevDebugMode(myR, 3, 4, 8);
-  };
-}
-
-// ==================== IN-GAME CONTROLS PANEL ====================
-function openInGameControlsPanel() {
-  let existing = document.getElementById("inGameControlsContainer");
-  if (existing) existing.remove();
-
-  let container = document.createElement("div");
-  container.id = "inGameControlsContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 450px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #6c5ce7;
-    text-align: left;
-  `;
-
-  panel.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:18px; color:#a29bfe;">⚔️ IN-GAME MODERATION</h2>
-      <button id="closeIgPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:13px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank}</span>
-    </div>
-    <button id="btnIgEmp" style="background:#8e44ad; color:white; border:none; padding:12px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold;">⚡ Trigger Ability EMP Jammer</button>
-  `;
-
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeIgPanel").onclick = () => container.remove();
-  document.getElementById("btnIgEmp").onclick = () => {
-    manualEmpLock = !manualEmpLock;
-    setPersistentAnnouncement("Global EMP Switch set to: " + (manualEmpLock ? "ACTIVE" : "OFF"));
-    container.remove();
-  };
-}
-
-// ==================== OFFICIAL STAFF PORTAL ====================
-function openInteractiveStaffPanel() {
-  let existingModal = document.getElementById("staffPanelContainer");
-  if (existingModal) existingModal.remove();
-
-  let isDevOrAdmin = (userRank === "Dev" || userRank === "Admin");
-  let isDev = (userRank === "Dev");
-
-  let container = document.createElement("div");
-  container.id = "staffPanelContainer";
-  container.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center;
-    z-index: 9999; font-family: sans-serif;
-  `;
-
-  let panel = document.createElement("div");
-  panel.style.cssText = `
-    background: #2d3436; color: white; width: 90%; max-width: 500px; padding: 20px;
-    border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.8); border: 2px solid #0984e3;
-    max-height: 80vh; overflow-y: auto; text-align: left;
-  `;
-
-  panel.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #636e72; padding-bottom:10px; margin-bottom:15px;">
-      <h2 style="margin:0; font-size:20px; color:#74b9ff;">🛡️ OFFICIAL STAFF PORTAL</h2>
-      <button id="closeStaffPanel" style="background:#e74c3c; border:none; color:white; font-weight:bold; padding:6px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
-    </div>
-    
-    <div style="margin-bottom:15px; background:#353b48; padding:8px; border-radius:6px; font-size:14px; text-align:center;">
-      Active User: <b>${localUsername}</b> | Rank: <span style="color:#f1c40f;">${userRank || "None"}</span>
-    </div>
-
-    <!-- TAB BUTTONS -->
-    <div style="display:flex; gap:6px; margin-bottom:15px;">
-      <button id="tabControls" style="flex:1; padding:8px; background:#0984e3; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Controls</button>
-      <button id="tabChat" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Chat (${staffChatMessages.length})</button>
-      <button id="tabReports" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">Reports (${submittedReports.length})</button>
-      <button id="tabVault" style="flex:1; padding:8px; background:#636e72; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;">🔒 Vault</button>
-    </div>
-
-    <!-- CONTROLS SECTION -->
-    <div id="sectionControls">
-      <h3 style="font-size:15px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Session Recovery</h3>
-      <div style="margin-bottom:12px; background:#1e272e; padding:10px; border-radius:6px;">
-        <button id="btnRestoreSessionBackup" style="background:#0984e3; color:white; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🔄 Restore Saved Session Backup</button>
-      </div>
-      <h3 style="font-size:15px; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:15px;">Dev Tools</h3>
-      ${isDev ? `
-      <button id="btnOpenDevTester" style="background:#00cec9; color:#2d3436; border:none; padding:10px; width:100%; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">🧪 Launch Dev Role Tester</button>
-      ` : `<div style="background:#1e272e; padding:10px; border-radius:6px; color:#b2bec3; font-size:12px; text-align:center;">🔒 Dev tools restricted to Dev rank.</div>`}
-    </div>
-
-    <!-- CHAT SECTION -->
-    <div id="sectionChat" style="display:none;">
-      <div id="chatHistoryBox" style="background:#1e272e; height:150px; overflow-y:auto; padding:8px; border-radius:6px; font-size:12px; margin-bottom:10px;">
-        ${staffChatMessages.length === 0 ? '<div style="color:#b2bec3;">No messages yet.</div>' : staffChatMessages.map(m => `<div><b>[${m.sender}]:</b> ${m.text}</div>`).join('')}
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="text" id="chatInputText" placeholder="Type staff message..." style="flex:1; padding:8px; border-radius:4px; border:none; font-size:12px;">
-        <button id="btnSendChatMsg" style="background:#0984e3; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; font-size:12px;">Send</button>
-      </div>
-    </div>
-
-    <!-- REPORTS SECTION -->
-    <div id="sectionReports" style="display:none;">
-      <div style="background:#1e272e; height:160px; overflow-y:auto; padding:8px; border-radius:6px; font-size:12px;">
-        ${submittedReports.length === 0 ? '<div style="color:#b2bec3;">No submitted reports.</div>' : submittedReports.map(r => `<div style="margin-bottom:8px; border-bottom:1px solid #636e72; padding-bottom:4px;"><b>Suspect:</b> ${r.suspect}<br><b>Reporter:</b> ${r.reporter}<br><b>Reason:</b> ${r.reason} (${r.time})</div>`).join('')}
-      </div>
-    </div>
-
-    <!-- VAULT SECTION -->
-    <div id="sectionVault" style="display:none;">
-      <h3 style="font-size:15px; color:#00cec9; border-bottom:1px solid #636e72; padding-bottom:5px; margin-top:0;">Encrypted Audit Vault</h3>
-      <div id="vaultLogDisplay" style="background:#1e272e; height:120px; overflow-y:auto; padding:8px; border-radius:6px; font-size:10px; font-family:monospace; color:#00cec9; word-break:break-all; margin-bottom:10px;">
-        ${localStorage.getItem("game_secureStaffVault") || "Vault is empty."}
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button id="btnExportVault" style="flex:1; background:#00b894; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 Export Token</button>
-        <button id="btnWipeVault" style="flex:1; background:#d63031; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🗑️ Secure Wipe</button>
-      </div>
-    </div>
-  `;
-
-  container.appendChild(panel);
-  document.body.appendChild(container);
-
-  document.getElementById("closeStaffPanel").onclick = () => container.remove();
-
-  let sControls = document.getElementById("sectionControls");
-  let sChat = document.getElementById("sectionChat");
-  let sReports = document.getElementById("sectionReports");
-  let sVault = document.getElementById("sectionVault");
-
-  let tControls = document.getElementById("tabControls");
-  let tChat = document.getElementById("tabChat");
-  let tReports = document.getElementById("tabReports");
-  let tVault = document.getElementById("tabVault");
-
-  tControls.onclick = () => {
-    sControls.style.display = "block"; sChat.style.display = "none"; sReports.style.display = "none"; sVault.style.display = "none";
-    tControls.style.background = "#0984e3"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72"; tVault.style.background = "#636e72";
-  };
-  tChat.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "block"; sReports.style.display = "none"; sVault.style.display = "none";
-    tControls.style.background = "#636e72"; tChat.style.background = "#0984e3"; tReports.style.background = "#636e72"; tVault.style.background = "#636e72";
-  };
-  tReports.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "block"; sVault.style.display = "none";
-    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#0984e3"; tVault.style.background = "#636e72";
-  };
-  tVault.onclick = () => {
-    sControls.style.display = "none"; sChat.style.display = "none"; sReports.style.display = "none"; sVault.style.display = "block";
-    tControls.style.background = "#636e72"; tChat.style.background = "#636e72"; tReports.style.background = "#636e72"; tVault.style.background = "#0984e3";
-  };
-
-  let btnRestore = document.getElementById("btnRestoreSessionBackup");
-  if (btnRestore) {
-    btnRestore.onclick = () => {
-      let success = restoreSessionFromSnapshot();
-      if (success) container.remove();
-    };
-  }
-
-  let btnDevTester = document.getElementById("btnOpenDevTester");
-  if (btnDevTester) {
-    btnDevTester.onclick = () => openDevRoleTesterPanel();
-  }
-
-  let btnSendChat = document.getElementById("btnSendChatMsg");
-  if (btnSendChat) {
-    btnSendChat.onclick = () => {
-      let inp = document.getElementById("chatInputText");
-      let msg = inp.value.trim();
-      if (msg !== "") {
-        let chatObj = { sender: localUsername + " (" + userRank + ")", text: msg };
-        staffChatMessages.push(chatObj);
-        saveStaffChat();
-        inp.value = "";
-        updateStaffChatDOM();
-        if (isMultiplayer) broadcastData({ type: "STAFF_CHAT", message: chatObj });
-      }
-    };
-  }
-
-  let btnExportVault = document.getElementById("btnExportVault");
-  if (btnExportVault) {
-    btnExportVault.onclick = () => {
-      let token = localStorage.getItem("game_secureStaffVault") || "";
-      if (token) {
-        navigator.clipboard.writeText(token);
-        setPersistentAnnouncement("Vault token copied to clipboard!");
-      }
-    };
-  }
-
-  let btnWipeVault = document.getElementById("btnWipeVault");
-  if (btnWipeVault) {
-    btnWipeVault.onclick = () => {
-      if (confirm("Are you sure you want to securely wipe staff logs?")) {
-        localStorage.removeItem("game_secureStaffVault");
-        staffChatMessages = [];
-        submittedReports = [];
-        saveStaffChat();
-        saveStaffReports();
-        document.getElementById("vaultLogDisplay").innerText = "Vault wiped clean.";
-        setPersistentAnnouncement("Vault wiped successfully!");
-      }
-    };
-  }
 }
